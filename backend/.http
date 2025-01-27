@@ -1,0 +1,9 @@
+# Test GET request to /api/test
+POST http://localhost:4000/api/auth/register
+Content-Type: application/json
+
+{
+    "name": "John",
+    "email": "John@gmail.com",
+    "password": "123456"
+}
