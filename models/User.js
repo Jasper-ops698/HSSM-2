@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true, // Automatically creates an index
       lowercase: true,
       validate: {
         validator: function (v) {
@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: true,
+      unique: true, // Automatically creates an index
     },
     password: {
       type: String,
@@ -43,10 +44,6 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-// Add indexes for better query performance
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ phone: 1 }, { unique: true });
 
 // Custom method to exclude sensitive fields (like password) from user data
 userSchema.methods.toJSON = function () {
