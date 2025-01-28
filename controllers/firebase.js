@@ -1,6 +1,6 @@
 require('dotenv').config(); 
 const admin = require('firebase-admin');
-const serviceAccount = path.join(__dirname, '/secrets/serviceAccountkey.json'); // require the service account key
+const serviceAccount = '/secrets/serviceAccountkey.json'; // require the service account key
 
 // Initialize Firebase Admin SDK
 // Initialize Firebase Admin SDK
