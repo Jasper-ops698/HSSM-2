@@ -50,7 +50,6 @@ app.options("*", cors());
 
 // Middleware: Request Parsing
 app.use(express.json({ limit: "10kb" })); // Limit JSON payload size
-app.use(bodyParser.json());
 
 // Connect to Database
 connectToDatabase()
