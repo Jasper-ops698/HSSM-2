@@ -10,8 +10,6 @@ const connectToDatabase = require("./db");
 
 dotenv.config(); // Load environment variables
 
-const port = process.env.PORT || 5000;
-
 const app = express();
 
 // Middleware: Security and Performance
