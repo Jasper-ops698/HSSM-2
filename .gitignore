@@ -60,5 +60,5 @@ Thumbs.db
 
 .vercel
 
-# serviceAccountKey.json
-firebase-admin.json
+# .gitignore
+/secrets/serviceAccountKey.json

@@ -1,5 +1,6 @@
+require('dotenv').config(); 
 const admin = require('firebase-admin');
-const serviceAccount = require(process.env.FIREBASE_JSON); // Add this line to require the service account key
+const serviceAccount = require(process.env.FIREBASE_JSON); // require the service account key
 
 // Initialize Firebase Admin SDK
 // Initialize Firebase Admin SDK

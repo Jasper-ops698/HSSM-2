@@ -58,12 +58,12 @@ connectToDatabase()
     console.log("Connected to the database.");
 
     // Import routes
-    const serviceRoutes = require("./routes/serviceRoutes");
-    const authRoutes = require("./routes/authRoutes");
-    const requestRoutes = require("./routes/requestRoutes");
-    const dashboardRoutes = require("./routes/dashboardRoutes");
-    const adminRoutes = require("./routes/adminRoutes");
-    const HssmRoutes = require("./routes/HssmRoutes");
+    const serviceRoutes = require("../routes/serviceRoutes");
+    const authRoutes = require("../routes/authRoutes");
+    const requestRoutes = require("../routes/requestRoutes");
+    const dashboardRoutes = require("../routes/dashboardRoutes");
+    const adminRoutes = require("../routes/adminRoutes");
+    const HssmRoutes = require("../routes/HssmRoutes");
 
     // Route Middleware
     app.use("/api/auth", authRoutes);
