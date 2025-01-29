@@ -28,7 +28,7 @@ app.use(limiter);
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
-  : ["http://localhost:3000"]; // Default origin
+  : ["https://hssm-sevices-page.onrender.com"; // Default origin
 
 app.use(
   cors({
