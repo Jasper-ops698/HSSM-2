@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const Request = require('../models/Request');
 const Service = require('../models/Service');
-const sendFCMNotification = require('./firebase'); // Assuming this is for notifications
 
 /**
  * Create a new service request
