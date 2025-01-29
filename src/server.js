@@ -26,37 +26,29 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS Configuration
-// Dynamic CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
-  : ["http://localhost:3000"]; // Default to localhost in dev
+  : [];
 
-console.log("Allowed Origins:", allowedOrigins);
-
+// Configure CORS
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log("Incoming request from origin:", origin); // Debug log for origin
+    // Allow requests from allowed origins or from non-browser tools (e.g., Postman)
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true); // Allow the request
+      callback(null, true); // Allow request
     } else {
-      console.error("Blocked by CORS:", origin); // Debug for blocked origins
-      callback(new Error("Origin not allowed by CORS"));
+      callback(new Error("CORS Error: Origin not allowed")); // Block request
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed HTTP methods
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "x-auth-token",
-  ], // Allowed custom headers
-  credentials: true, // Allow cookies and credentials
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // HTTP methods allowed
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"], // Headers allowed
+  credentials: false, // Set to true only if you need cookies or auth headers
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Preflight requests handler
+// Handle preflight (OPTIONS) requests
 app.options("*", cors(corsOptions));
 
 // Middleware for parsing requests
