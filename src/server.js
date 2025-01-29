@@ -26,29 +26,40 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS Configuration
+// Dynamic CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
-  : ["http://localhost:3000"]; // Default origin
+  : ["http://localhost:3000"]; // Default to localhost in dev
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true); // Allow request
-      } else {
-        callback(new Error("Origin not allowed by CORS")); // Block request
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed HTTP methods
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "x-auth-token"], // Include custom headers
-    credentials: true, // Allow cookies/credentials
-  })
-);
+console.log("Allowed Origins:", allowedOrigins);
 
-// Handle preflight requests for all routes
-app.options("*", cors());
+const corsOptions = {
+  origin: (origin, callback) => {
+    console.log("Incoming request from origin:", origin); // Debug log for origin
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true); // Allow the request
+    } else {
+      console.error("Blocked by CORS:", origin); // Debug for blocked origins
+      callback(new Error("Origin not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Allowed HTTP methods
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "x-auth-token",
+  ], // Allowed custom headers
+  credentials: true, // Allow cookies and credentials
+};
 
-// Middleware: Request Parsing
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Preflight requests handler
+app.options("*", cors(corsOptions));
+
+// Middleware for parsing requests
 app.use(express.json({ limit: "10kb" })); // Limit JSON payload size
 
 // Connect to Database
