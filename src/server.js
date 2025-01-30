@@ -25,11 +25,12 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS Configuration
-const allowedOrigins = ["https://hssm-sevices-page.onrender.com",]
-  ? process.env.ALLOWED_ORIGINS.split(",")
-  : [];
+const allowedOrigins = ["https://hssm-sevices-page.onrender.com"]; // Default origin
 
+if (process.env.ALLOWED_ORIGINS) {
+  const additionalOrigins = process.env.ALLOWED_ORIGINS.split(",");
+  allowedOrigins.push(...additionalOrigins); // Add origins from env variable
+}
 // Configure CORS
 const corsOptions = {
   origin: (origin, callback) => {
