@@ -26,7 +26,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS Configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
+const allowedOrigins = ["https://hssm-sevices-page.onrender.com",]
   ? process.env.ALLOWED_ORIGINS.split(",")
   : [];
 
