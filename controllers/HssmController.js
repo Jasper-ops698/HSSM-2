@@ -64,12 +64,13 @@ exports.getAllAssets = async (req, res) => {
 // Task Controllers
 exports.createTask = async (req, res) => {
     try {
-        const { task, assignedTo, dueDate, priority } = req.body;
+        const { task, assignedTo, id, dueDate, priority, taskDescription } = req.body;
         const file = req.file ? req.file.filename : null;
 
         const newTask = new Task({
             task,
             assignedTo,
+            id,
             dueDate,
             priority,
             taskDescription,

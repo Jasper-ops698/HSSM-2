@@ -24,6 +24,7 @@ const assetSchema = new mongoose.Schema({
 const taskSchema = new mongoose.Schema({
     task: { type: String, required: true }, // Task title or description
     assignedTo: { type: String, required: true }, // Person assigned to the task
+    id: { type: mongoose.Schema.Types.Mixed, required: true }, // ID as either a number or string
     dueDate: { type: Date, required: true }, // Due date for the task
     priority: { type: String, enum: ['Low', 'Medium', 'High'], required: true }, // Priority level
     'task description': { type: String }, // Task status or description

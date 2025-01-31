@@ -3,7 +3,7 @@ const router = express.Router();
 const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders } = require('../controllers/adminController');
 
 // Add a service provider
-router.post('/serviceProvider', addServiceProvider);
+router.post('/addProvider', addServiceProvider);
 
 // Delete a service provider
 router.delete('/serviceProvider/:id', deleteServiceProvider);
