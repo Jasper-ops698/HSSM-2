@@ -1,35 +1,20 @@
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const Service = require('../models/Service');
 const upload = require('../middlewares/multerSetup');
 
-// Multer setup for memory storage (storing file in memory)
-const storage = multer.memoryStorage();
-
-const fileFilter = (req, file, cb) => {
-  const allowedFileTypes = /jpeg|jpg|png|gif/;
-  const extname = allowedFileTypes.test(file.originalname.toLowerCase());
-  const mimetype = allowedFileTypes.test(file.mimetype);
-
-  if (extname && mimetype) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed!'), false);
-  }
-};
-
-// Create service with image upload handling (store in MongoDB)
+// Create service with image upload handling (store file path in MongoDB)
 exports.createService = [
-  upload.single('image'),
   async (req, res, next) => {
     try {
       if (req.user.role !== 'service-provider' && req.user.role !== 'admin') {
         return next(new Error('Only service providers or admins can create services'));
       }
 
-      let imageBase64 = '';
+      let imagePath = '';
       if (req.file) {
-        // Convert the uploaded file to Base64
-        imageBase64 = req.file.buffer.toString('base64');
+        imagePath = req.file.path;
       }
 
       const service = await Service.create({
@@ -37,7 +22,7 @@ exports.createService = [
         name: req.body.name,
         description: req.body.description,
         price: req.body.price,
-        image: imageBase64, // Save Base64 string to MongoDB
+        image: imagePath, // Save file path to MongoDB
       });
 
       res.status(201).json({
@@ -52,10 +37,8 @@ exports.createService = [
 
 // Delete service remains unchanged
 exports.deleteService = async (req, res, next) => {
-  const { id } = req.params;
-
   try {
-    const service = await Service.findById(id);
+    const service = await Service.findById(req.params.id);
 
     if (!service) {
       return next(new Error(`Service not found with id of ${id}`));
@@ -63,6 +46,11 @@ exports.deleteService = async (req, res, next) => {
 
     if (service.provider.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return next(new Error(`You can only delete your own services or if you are an admin`));
+    }
+
+    // Delete the image file from the server
+    if (service.image) {
+      fs.unlinkSync(service.image);
     }
 
     await service.remove();
@@ -91,7 +79,6 @@ exports.getServices = async (req, res, next) => {
 
 // Update services
 exports.updateService = [
-  upload.single('image'),
   async (req, res, next) => {
     const { id } = req.params;
 
@@ -106,10 +93,13 @@ exports.updateService = [
         return next(new Error(`You can only update your own services or if you are an admin`));
       }
 
-      let imageBase64 = service.image;
+      let imagePath = service.image;
       if (req.file) {
-        // Convert the uploaded file to Base64
-        imageBase64 = req.file.buffer.toString('base64');
+        // Delete the old image file from the server
+        if (imagePath) {
+          fs.unlinkSync(imagePath);
+        }
+        imagePath = req.file.path;
       }
 
       service = await Service.findByIdAndUpdate(
@@ -118,7 +108,7 @@ exports.updateService = [
           name: req.body.name,
           description: req.body.description,
           price: req.body.price,
-          image: imageBase64, // Update Base64 string in MongoDB
+          image: imagePath, // Update file path in MongoDB
         },
         { new: true, runValidators: true }
       );

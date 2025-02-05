@@ -69,11 +69,22 @@ router.get('/provider/:deviceToken/:serviceType', async (req, res) => {
   }
 });
 
-// Get all services
+// Get all services of individual service-provider
+router.get('/service', protect, async (req, res) => {
+  try {
+
+    // Fetch services where provider matches the ObjectId
+    const services = await Service.find({ provider: req.user._id });
+    res.status(200).json(services);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to retrieve services.', error });
+  }
+});
+
 router.get('/', protect, async (req, res) => {
   try {
-    const services = await Service.find({});
-    res.json(services);
+    const services = await Service.find().populate('provider', 'name email phone');
+    res.status(200).json(services);
   } catch (error) {
     res.status(500).json({ message: 'Failed to retrieve services.', error });
   }

@@ -14,7 +14,7 @@ const serviceSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      maxlength: 500,
+      maxlength: 8000,
     },
     price: {
       type: Number,
