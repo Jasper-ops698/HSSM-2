@@ -68,6 +68,7 @@ connectToDatabase()
     const dashboardRoutes = require("../routes/dashboardRoutes");
     const adminRoutes = require("../routes/adminRoutes");
     const HssmRoutes = require("../routes/HssmRoutes");
+    const chatRoutes = require('../routes/chatRoutes'); // Import chat routes
 
     // Route Middleware
     app.use("/api/auth", authRoutes);
@@ -76,6 +77,7 @@ connectToDatabase()
     app.use("/api/dashboard", dashboardRoutes);
     app.use("/api/admin", adminRoutes);
     app.use("/api/hssm", HssmRoutes);
+    app.use('/api/chat', chatRoutes);
 
     // Route for Gemini AI Report Generation
     app.post("/api/gemini/report", async (req, res) => {
