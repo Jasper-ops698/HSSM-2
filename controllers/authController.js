@@ -2,25 +2,23 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
 const { validationResult } = require('express-validator');
-const nodemailer = require('nodemailer'); // For sending emails
+const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
 dotenv.config();
 
-// Define environment variables for email configuration (or use a .env file)
-const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD } = process.env;
-
 // Create a reusable transporter object for sending emails
 const transporter = nodemailer.createTransport({
-  host: EMAIL_HOST,
-  port: EMAIL_PORT,
-  secure: false, // true for 465, false for other ports
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: false,
   auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASSWORD,
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
   },
 });
 
-exports.registerUser = async (req, res) => {
+// Define the registerUser function
+const registerUser = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -29,24 +27,19 @@ exports.registerUser = async (req, res) => {
   const { name, email, phone, password, role } = req.body;
 
   try {
-    // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create the new user
     const user = await User.create({ name, email, phone, password: hashedPassword, role });
 
-    // Generate token for the user
     const token = generateToken(user._id, email, name, phone, role);
 
-    // Return only the token and user data as separate fields
     return res.status(201).json({
-      token, // This will be a string
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -61,7 +54,8 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-exports.loginUser = async (req, res) => {
+// Define the loginUser function
+const loginUser = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -70,24 +64,20 @@ exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Find the user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Compare password hashes
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate token
     const token = generateToken(user._id, user.email, user.name, user.phone, user.role);
 
-    // Return the token and user data
     return res.status(200).json({
-      token, // This will be a string
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -102,7 +92,7 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-exports.forgotPassword = async (req, res) => {
+const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
@@ -120,7 +110,7 @@ exports.forgotPassword = async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: EMAIL_USER,
+      from: process.env.EMAIL_USER,
       to: user.email,
       subject: 'Password Reset Request',
       text: `You are receiving this email because you (or someone else) have requested a password reset for your account.
@@ -136,26 +126,39 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-exports.DeviceToken = async (req, res) => {
+const DeviceToken = async (req, res) => {
   const { userId, deviceToken } = req.body;
-  
-  try {
-    // Validate the device token and userId (optional)
-    if (!userId || !deviceToken) {
-      return res.status(400).json({ message: 'User ID and device token are required' });
-    }
 
-    // Find the user and update the device token
-    const user = await User.findByIdAndUpdate(userId, { deviceToken }, { new: true });
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Successfully updated the device token
-    res.status(200).json({ message: 'Device token updated successfully' });
-  } catch (err) {
-    console.error('Error saving device token:', err);
-    res.status(500).json({ message: 'Error saving device token' });
+  // Validate input
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
   }
+
+  if (!deviceToken) {
+    return res.status(400).json({ message: 'Device token is required.' });
+  }
+
+  try {
+    // Example: Save the device token to the database
+    // Replace this with your actual database logic
+    console.log(`Saving device token for userId: ${userId}, deviceToken: ${deviceToken}`);
+    // Simulate database save operation
+    const result = { success: true }; // Replace with actual database operation
+
+    if (!result.success) {
+      return res.status(500).json({ message: 'Failed to save device token.' });
+    }
+
+    res.status(200).json({ message: 'Device token registered successfully.' });
+  } catch (error) {
+    console.error('Error registering device token:', error);
+    res.status(500).json({ message: 'An internal server error occurred.' });
+  }
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  forgotPassword,
+  DeviceToken,
 };

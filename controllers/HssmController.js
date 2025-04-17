@@ -33,21 +33,27 @@ exports.getAllIncidents = async (req, res) => {
 // Asset Controllers
 exports.createAsset = async (req, res) => {
     try {
-        const { name, serialNumber, category, location } = req.body;
+        const { name, serialNumber, category, location, serviceRecords } = req.body; // Added serviceRecords
         const file = req.file ? req.file.filename : null;
+
+        // Validate required fields
+        if (!name || !serialNumber || !category || !location) {
+            return res.status(400).json({ error: 'All fields are required: name, serialNumber, category, and location.' });
+        }
 
         const newAsset = new Asset({
             name,
             serialNumber,
             category,
             location,
-            serviceRecords,
+            serviceRecords, // Ensure serviceRecords is included
             file,
         });
 
         await newAsset.save();
         res.status(201).json(newAsset);
     } catch (err) {
+        console.error('Error creating asset:', err);
         res.status(500).json({ error: err.message });
     }
 };

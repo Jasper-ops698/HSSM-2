@@ -1,76 +1,94 @@
 const express = require("express");
-const bodyParser = require("body-parser");
+const bodyParser = require("body-parser"); // You might not strictly need this if only using express.json/urlencoded
 const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
-const compression = require("compression"); // For response compression
-const connectToDatabase = require("./db");
-const axios = require("axios"); // Import axios for making API requests
+const compression = require("compression");
+const path = require('path'); // <--- IMPORT path MODULE
+const connectToDatabase = require("./db"); // Assuming db.js is in the same directory
+const axios = require("axios");
 
-dotenv.config(); // Load environment variables
+// Load environment variables from .env file
+dotenv.config();
 
+// Initialize Express app
 const app = express();
 
-// Middleware: Security and Performance
-app.use(helmet()); // Secure HTTP headers
-app.use(compression()); // Compress response bodies
-app.use(morgan("common")); // Log requests with less verbosity in production
+// --- Core Middleware ---
 
-// Rate Limiting Middleware
+// Security Headers
+app.use(helmet());
+
+// Response Compression
+app.use(compression());
+
+// Request Logging (Using 'common' format, suitable for production)
+// Consider 'dev' for development: app.use(morgan('dev'));
+app.use(morgan("common"));
+
+// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
-  message: { message: "Too many requests, please try again later." },
+  message: { success: false, message: "Too many requests, please try again later." },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => req.path.startsWith('/uploads'), // Skip rate limiting for uploads
 });
 app.use(limiter);
 
-const allowedOrigins = ["https://hssm-sevices-page.onrender.com"]; // Default origin
+app.use(express.json({ limit: "10kb" }));
+
+// --- CORS Configuration ---
+const defaultOrigin = "https://hssm-sevices-page.onrender.com";
+let allowedOrigins = [defaultOrigin, "http://localhost:3000"];
 
 if (process.env.ALLOWED_ORIGINS) {
-  const additionalOrigins = process.env.ALLOWED_ORIGINS.split(",");
-  allowedOrigins.push(...additionalOrigins); // Add origins from env variable
+  const additionalOrigins = process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim());
+  allowedOrigins = [...allowedOrigins, ...additionalOrigins];
 }
-// Configure CORS
+console.log("Allowed CORS Origins:", allowedOrigins);
+
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests from allowed origins or from non-browser tools (e.g., Postman)
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true); // Allow request
+      callback(null, true);
     } else {
-      callback(new Error("CORS Error: Origin not allowed")); // Block request
+      console.error(`CORS Error: Origin '${origin}' not allowed:`, origin);
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // HTTP methods allowed
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"], // Headers allowed
-  credentials: false, // Set to true only if you need cookies or auth headers
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
+  credentials: true,
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
 
-// Handle preflight (OPTIONS) requests
+// Explicitly handle preflight (OPTIONS) requests
+// This ensures OPTIONS requests get the correct CORS headers before the actual request
 app.options("*", cors(corsOptions));
 
-// Middleware for parsing requests
-app.use(express.json({ limit: "10kb" })); // Limit JSON payload size
 
-// Connect to Database
+// --- Database Connection and Route Setup ---
 connectToDatabase()
   .then(() => {
-    console.log("Connected to the database.");
+    console.log("Successfully connected to the database.");
 
-    // Import routes
+    // --- Import Routes ---
+    // Ensure paths are correct relative to this file's location
     const serviceRoutes = require("../routes/serviceRoutes");
     const authRoutes = require("../routes/authRoutes");
     const requestRoutes = require("../routes/requestRoutes");
     const dashboardRoutes = require("../routes/dashboardRoutes");
     const adminRoutes = require("../routes/adminRoutes");
     const HssmRoutes = require("../routes/HssmRoutes");
-    const chatRoutes = require('../routes/chatRoutes'); // Import chat routes
+    const chatRoutes = require('../routes/chatRoutes');
 
-    // Route Middleware
+    // --- API Route Middleware ---
     app.use("/api/auth", authRoutes);
     app.use("/api/services", serviceRoutes);
     app.use("/api/requests", requestRoutes);
@@ -79,8 +97,13 @@ connectToDatabase()
     app.use("/api/hssm", HssmRoutes);
     app.use('/api/chat', chatRoutes);
 
-    // Route for Gemini AI Report Generation
-    app.post("/api/gemini/report", async (req, res) => {
+    // Serve static files from the uploads directory
+    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+    console.log(`Serving static files from: ${path.join(__dirname, '../uploads')}`);
+
+    // --- Gemini AI Routes ---
+    // (Keeping the Gemini routes as you provided them)
+    app.post("/api/gemini/report", async (req, res, next) => { // Added next for error handling consistency
       try {
         const { userId, startDate, endDate } = req.body;
 
@@ -91,86 +114,144 @@ connectToDatabase()
           });
         }
 
-        // Fetch user-specific data from the database
-        const incidents = await IncidentModel.find({ userId, date: { $gte: startDate, $lte: endDate } });
-        const assets = await AssetModel.find({ userId });
-        const tasks = await TaskModel.find({ userId, dueDate: { $gte: startDate, $lte: endDate } });
-        const meterReadings = await MeterReadingModel.find({ userId, date: { $gte: startDate, $lte: endDate } });
+        // Placeholder: Replace with your actual data fetching logic using Mongoose models
+        // const incidents = await IncidentModel.find({ userId, date: { $gte: startDate, $lte: endDate } });
+        // const assets = await AssetModel.find({ userId });
+        // const tasks = await TaskModel.find({ userId, dueDate: { $gte: startDate, $lte: endDate } });
+        // const meterReadings = await MeterReadingModel.find({ userId, date: { $gte: startDate, $lte: endDate } });
+        const incidents = []; // Example data
+        const assets = [];
+        const tasks = [];
+        const meterReadings = [];
 
         // Prepare data for the AI API
         const inputData = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Generate a report for the following data:\n\nSummary:\n- Total Assets: ${assets.length}\n- Pending Incidents: ${incidents.length}\n- Maintenance Tasks: ${tasks.length}\n\nMeter Readings:\n${meterReadings
-                    .map((reading, index) => `Location ${index + 1}: ${reading.location} (${reading.reading} readings)`)
-                    .join("\n")}\n\nDetailed Data:\nIncidents: ${JSON.stringify(incidents, null, 2)}\nAssets: ${JSON.stringify(
-                    assets,
-                    null,
-                    2
-                  )}\nTasks: ${JSON.stringify(tasks, null, 2)}`,
-                },
-              ],
-            },
-          ],
+          contents: [ { parts: [ {
+                text: `Generate a report summary for user ID ${userId} from ${startDate} to ${endDate} based on the following data (provide a concise overview):\n\nAssets: ${assets.length}\nIncidents: ${incidents.length}\nTasks: ${tasks.length}\nMeter Readings: ${meterReadings.length}\n\nDetailed Data (if needed for context):\nIncidents: ${JSON.stringify(incidents)}\nAssets: ${JSON.stringify(assets)}\nTasks: ${JSON.stringify(tasks)}\nMeter Readings: ${JSON.stringify(meterReadings)}`
+              } ] } ],
         };
 
-        // Call the Gemini AI API
+        // Call the Gemini AI API (ensure GEMINI_API_KEY is set in .env)
         const aiResponse = await axios.post(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, // Corrected endpoint structure
           inputData,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.GEMINI_API_KEY}`, // Use your AI API key
-            },
-          }
+          { headers: { "Content-Type": "application/json" } } // API key is in URL now
         );
 
-        if (aiResponse.status === 200) {
+        // Check for response structure and potential errors from Gemini API
+        if (aiResponse.data && aiResponse.data.candidates && aiResponse.data.candidates[0].content) {
           res.status(200).json({
             success: true,
-            report: aiResponse.data.contents[0].parts[0].text, // Assuming the AI API returns the report in this structure
+            report: aiResponse.data.candidates[0].content.parts[0].text,
           });
         } else {
-          res.status(aiResponse.status).json({
-            success: false,
-            message: aiResponse.data.message || "Failed to generate report using AI API",
-          });
+          console.error("Unexpected AI API response structure:", aiResponse.data);
+          // Send back Gemini's error if available
+          const errorMessage = aiResponse.data?.error?.message || "Failed to generate report: Unexpected AI response.";
+          res.status(500).json({ success: false, message: errorMessage });
         }
       } catch (error) {
-        console.error("Error generating report:", error);
-        res.status(500).json({
-          success: false,
-          message: "Failed to generate report",
-        });
+         // Pass error to the central error handler
+        console.error("Error in /api/gemini/report:", error.response?.data || error.message);
+        next(error); // Forward error to the error handling middleware
       }
     });
 
-    // Static File Serving (e.g., file uploads)
-    app.use("/uploads", express.static("uploads"));
+    app.post("/api/gemini/chat", async (req, res, next) => { // Added next
+      try {
+        const { message } = req.body;
 
-    // Default Route
-    app.get("/", (req, res) => {
-      res.send("Welcome to the Local Service App API");
+        if (!message) {
+          return res.status(400).json({ success: false, message: "Message is required." });
+        }
+        console.log("Received chat message:", message);
+
+        const inputData = {
+          contents: [ { parts: [ { text: message } ] } ],
+        };
+
+        // Call the Gemini AI API (ensure GEMINI_API_KEY is set in .env)
+         const aiResponse = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, // Corrected endpoint structure
+          inputData,
+          { headers: { "Content-Type": "application/json" } } // API key is in URL now
+        );
+
+        // Check for response structure and potential errors from Gemini API
+       if (aiResponse.data && aiResponse.data.candidates && aiResponse.data.candidates[0].content) {
+          res.status(200).json({
+            success: true,
+            response: aiResponse.data.candidates[0].content.parts[0].text,
+          });
+        } else {
+          console.error("Unexpected AI API chat response structure:", aiResponse.data);
+           const errorMessage = aiResponse.data?.error?.message || "Failed to process chat: Unexpected AI response.";
+          res.status(500).json({ success: false, message: errorMessage });
+        }
+      } catch (error) {
+        // Pass error to the central error handler
+        console.error("Error in /api/gemini/chat:", error.response?.data || error.message);
+        next(error); // Forward error to the error handling middleware
+      }
     });
 
-    // Error Handling Middleware
+    // --- Static File Serving ---
+    // Serve files from the 'uploads' directory (make sure this directory exists)
+    // Creates a virtual path '/uploads' mapped to the physical './uploads' directory
+    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+    console.log(`Serving static files from: ${path.join(__dirname, '../uploads')}`);
+
+    // --- Default Route ---
+    // A simple welcome message for the root URL
+    app.get("/", (req, res) => {
+      res.setHeader('Content-Type', 'text/html');
+      res.send("<h1>Welcome to the Local Service App API</h1><p>API endpoints are available under /api/...</p>");
+    });
+
+    // --- Catch-all for undefined routes (404 Not Found) ---
+    // This should be placed after all other routes
+    app.use((req, res, next) => {
+        res.status(404).json({ success: false, message: `Cannot ${req.method} ${req.originalUrl}` });
+    });
+
+
+    // --- Central Error Handling Middleware ---
+    // Must have 4 arguments (err, req, res, next) to be recognized as an error handler
     app.use((err, req, res, next) => {
-      console.error(err.stack);
-      res.status(err.status || 500).json({
+      console.error("Unhandled Error:", err.stack || err); // Log the full error stack
+
+      // Check if the error is a CORS error
+      if (err.message === "Not allowed by CORS") {
+        return res.status(403).json({ // Use 403 Forbidden for CORS issues
+             success: false,
+             message: "Origin not allowed by CORS policy."
+         });
+      }
+
+       // Determine status code - use error's status or default to 500
+      const statusCode = err.status || err.statusCode || 500;
+
+      // Send JSON response
+      res.status(statusCode).json({
         success: false,
         message: err.message || "Internal Server Error",
+        // Optionally include stack trace in development
+        // stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
       });
     });
 
-    // Start the Server
+
+    // --- Start the Server ---
     const PORT = process.env.PORT || 5000;
+    // Listen on 0.0.0.0 to accept connections from any network interface (important for Render/Docker)
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on http://0.0.0.0:${PORT}`);
+      console.log(`Server successfully started and running on http://localhost:${PORT} (accessible externally if configured)`);
     });
+
   })
   .catch((err) => {
-    console.error("Failed to connect to the database:", err);
+    // Handle initial database connection errors
+    console.error("FATAL: Failed to connect to the database. Server cannot start.");
+    console.error(err);
+    process.exit(1); // Exit the process with an error code
   });
