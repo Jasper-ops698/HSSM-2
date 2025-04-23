@@ -7,6 +7,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const compression = require("compression");
 const path = require('path'); // <--- IMPORT path MODULE
+const fs = require('fs'); // Add fs module for directory checking
 const connectToDatabase = require("./db"); // Assuming db.js is in the same directory
 const axios = require("axios");
 
@@ -18,8 +19,10 @@ const app = express();
 
 // --- Core Middleware ---
 
-// Security Headers
-app.use(helmet());
+// Security Headers (with adjustments for images)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 // Response Compression
 app.use(compression());
@@ -43,7 +46,7 @@ app.use(express.json({ limit: "10kb" }));
 
 // --- CORS Configuration ---
 const defaultOrigin = "https://hssm-sevices-page.onrender.com";
-let allowedOrigins = [defaultOrigin, "http://localhost:3000"];
+let allowedOrigins = [defaultOrigin, "http://localhost:3000", "http://localhost:4000"];
 
 if (process.env.ALLOWED_ORIGINS) {
   const additionalOrigins = process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim());
@@ -63,6 +66,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
   credentials: true,
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 };
 
 // Apply CORS middleware
@@ -72,6 +76,25 @@ app.use(cors(corsOptions));
 // This ensures OPTIONS requests get the correct CORS headers before the actual request
 app.options("*", cors(corsOptions));
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('Created uploads directory:', uploadsDir);
+}
+
+// Configure static file serving with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
+    'Cross-Origin-Resource-Policy': 'cross-origin'
+  });
+  next();
+}, express.static(path.join(__dirname, '../uploads')));
+
+console.log(`Serving static files from: ${uploadsDir}`);
 
 // --- Database Connection and Route Setup ---
 connectToDatabase()
@@ -97,10 +120,6 @@ connectToDatabase()
     app.use("/api/hssm", HssmRoutes);
     app.use('/api/chat', chatRoutes);
 
-    // Serve static files from the uploads directory
-    app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-    console.log(`Serving static files from: ${path.join(__dirname, '../uploads')}`);
-
     // --- Gemini AI Routes ---
     // (Keeping the Gemini routes as you provided them)
     app.post("/api/gemini/report", async (req, res, next) => { // Added next for error handling consistency
@@ -114,20 +133,18 @@ connectToDatabase()
           });
         }
 
-        // Placeholder: Replace with your actual data fetching logic using Mongoose models
-        // const incidents = await IncidentModel.find({ userId, date: { $gte: startDate, $lte: endDate } });
-        // const assets = await AssetModel.find({ userId });
-        // const tasks = await TaskModel.find({ userId, dueDate: { $gte: startDate, $lte: endDate } });
-        // const meterReadings = await MeterReadingModel.find({ userId, date: { $gte: startDate, $lte: endDate } });
-        const incidents = []; // Example data
-        const assets = [];
-        const tasks = [];
-        const meterReadings = [];
+        // Fetch real data using Mongoose models
+        const { Incident, Asset, Task, MeterReading, HospitalProfile } = require('../models/Hssm');
+        const profile = await HospitalProfile.findOne({ userId });
+        const incidents = await Incident.find({ userId, date: { $gte: new Date(startDate), $lte: new Date(endDate) } });
+        const assets = await Asset.find({ userId });
+        const tasks = await Task.find({ userId, dueDate: { $gte: new Date(startDate), $lte: new Date(endDate) } });
+        const meterReadings = await MeterReading.find({ userId, date: { $gte: new Date(startDate), $lte: new Date(endDate) } });
 
         // Prepare data for the AI API
         const inputData = {
           contents: [ { parts: [ {
-                text: `Generate a report summary for user ID ${userId} from ${startDate} to ${endDate} based on the following data (provide a concise overview):\n\nAssets: ${assets.length}\nIncidents: ${incidents.length}\nTasks: ${tasks.length}\nMeter Readings: ${meterReadings.length}\n\nDetailed Data (if needed for context):\nIncidents: ${JSON.stringify(incidents)}\nAssets: ${JSON.stringify(assets)}\nTasks: ${JSON.stringify(tasks)}\nMeter Readings: ${JSON.stringify(meterReadings)}`
+                text: `Generate a comprehensive technical and management report for a hospital with the following profile and operational data.\n\nMission: ${profile?.mission || 'Not set'}\nVision: ${profile?.vision || 'Not set'}\nService Charter: ${profile?.serviceCharter || 'Not set'}\n\nAssets: ${assets.length}\nIncidents: ${incidents.length}\nTasks: ${tasks.length}\nMeter Readings: ${meterReadings.length}\n\nDetailed Data (for context):\nIncidents: ${JSON.stringify(incidents)}\nAssets: ${JSON.stringify(assets)}\nTasks: ${JSON.stringify(tasks)}\nMeter Readings: ${JSON.stringify(meterReadings)}\n\nBased on this, provide:\n- Actionable recommendations for improvement\n- A prediction of the facility's future growth and challenges\n- A summary for management and stakeholders.`
               } ] } ],
         };
 

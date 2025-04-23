@@ -156,9 +156,55 @@ const DeviceToken = async (req, res) => {
   }
 };
 
+// Update user profile (name, email)
+const updateProfile = async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ message: 'Name and email are required.' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name, email },
+      { new: true }
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ message: 'Error updating profile.' });
+  }
+};
+
+// Change password
+const changePassword = async (req, res) => {
+  try {
+    const { current, newPassword } = req.body;
+    if (!current || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required.' });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    const isMatch = await bcrypt.compare(current, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect.' });
+    }
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error changing password.' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   forgotPassword,
   DeviceToken,
+  updateProfile,
+  changePassword,
 };

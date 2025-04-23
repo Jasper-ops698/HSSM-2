@@ -2,7 +2,14 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 
-// Define schemas
+// Define hospitalLevels schema
+const hospitalLevelSchema = new mongoose.Schema({
+    level: { type: Number, required: true, min: 1, max: 6, unique: true },
+    services: { type: [String], required: true },
+    requirements: { type: Object }
+});
+
+// Define incident schema
 const incidentSchema = new mongoose.Schema({
     department: { type: String, required: true }, // Department associated with the incident
     title: { type: String, required: true }, // Title of the incident
@@ -12,45 +19,56 @@ const incidentSchema = new mongoose.Schema({
     file: { type: String }, // File attachment (optional)
 });
 
+// Define asset schema
 const assetSchema = new mongoose.Schema({
     name: { type: String, required: true }, // Name of the asset
     serialNumber: { type: mongoose.Schema.Types.Mixed, required: true }, // Serial number of the asset (can be string or number)
-    category: { type: String, enum: ['Fixed Assets', 'Consumables'], default: 'Fixed Assets' }, // Category
+    category: { type: String, enum: ['Fixed Assets', 'Consumables', 'Other'], required: true }, // Category with added 'Other'
     location: { type: String, required: true }, // Location of the asset
-    'service records': { type: String }, // Service records (optional)
+    serviceRecords: { type: String }, // Service records (optional), renamed from 'service records'
     file: { type: String }, // File attachment (optional)
 });
 
+// Define task schema
 const taskSchema = new mongoose.Schema({
     task: { type: String, required: true }, // Task title or description
     assignedTo: { type: String, required: true }, // Person assigned to the task
     id: { type: mongoose.Schema.Types.Mixed, required: true }, // ID as either a number or string
     dueDate: { type: Date, required: true }, // Due date for the task
-    priority: { type: String, enum: ['Low', 'Medium', 'High'], required: true }, // Priority level
-    'task description': { type: String }, // Task status or description
+    priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' }, // Priority level with default
+    taskDescription: { type: String }, // Task description, renamed from 'task description'
     file: { type: String }, // File attachment (optional)
 });
 
+// Define meterReading schema with flattened structure and userId
 const meterReadingSchema = new mongoose.Schema({
-    readings: [
-      {
-        location: { type: String, required: true },
-        reading: { type: Number, required: true },
-        date: { type: Date, required: true },
-      },
-    ],
-  });
+    location: { type: String, required: true },
+    reading: { type: Number, required: true },
+    date: { type: Date, required: true },
+    userId: { type: String, required: true }
+});
 
+// Define report schema
 const reportSchema = new mongoose.Schema({
     file: { type: String, required: true }, // File attachment for the report
 });
 
+// Define hospitalProfile schema for mission, vision, and service charter
+const hospitalProfileSchema = new mongoose.Schema({
+    userId: { type: String, required: true, unique: true },
+    mission: { type: String, default: '' },
+    vision: { type: String, default: '' },
+    serviceCharter: { type: String, default: '' },
+});
+
 // Models
+const HospitalLevel = mongoose.model('HospitalLevel', hospitalLevelSchema);
 const Incident = mongoose.model('Incident', incidentSchema);
 const Asset = mongoose.model('Asset', assetSchema);
 const Task = mongoose.model('Task', taskSchema);
 const MeterReading = mongoose.model('MeterReading', meterReadingSchema);
 const Report = mongoose.model('Report', reportSchema);
+const HospitalProfile = mongoose.model('HospitalProfile', hospitalProfileSchema);
 
 // Multer setup
 const storage = multer.diskStorage({
@@ -64,4 +82,4 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-module.exports = { Incident, Asset, Task, MeterReading, Report, upload };
+module.exports = { HospitalLevel, Incident, Asset, Task, MeterReading, Report, HospitalProfile, upload };
