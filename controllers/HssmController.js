@@ -188,6 +188,23 @@ exports.getAllMeterReadings = async (req, res, next) => {
   }
 };
 
+// Meter Reading Trend Controller
+exports.getMeterReadingTrend = async (req, res, next) => {
+  try {
+    const userId = req.user ? req.user._id.toString() : null;
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+    const limit = parseInt(req.query.limit, 10) || 30;
+    const meterReadings = await MeterReading.find({ userId })
+      .sort({ date: -1 })
+      .limit(limit);
+    res.status(200).json(meterReadings.reverse()); // Return in ascending order by date
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Hospital Profile Controllers
 exports.getHospitalProfile = async (req, res, next) => {
   try {
@@ -212,12 +229,97 @@ exports.updateHospitalProfile = async (req, res, next) => {
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
-    const { mission, vision, serviceCharter } = req.body;
+    
+    const { 
+      hospitalName, 
+      establishedDate, 
+      location, 
+      mission, 
+      vision, 
+      serviceCharter 
+    } = req.body;
+
+    const updateData = {
+      hospitalName: sanitizeInput(hospitalName),
+      establishedDate: establishedDate ? new Date(establishedDate) : undefined,
+      location: location ? {
+        address: sanitizeInput(location.address),
+        city: sanitizeInput(location.city),
+        state: sanitizeInput(location.state),
+        country: sanitizeInput(location.country),
+        postalCode: sanitizeInput(location.postalCode)
+      } : undefined,
+      mission: sanitizeInput(mission),
+      vision: sanitizeInput(vision),
+      serviceCharter: sanitizeInput(serviceCharter)
+    };
+
+    // If there's an organogram file
+    if (req.files?.organogram) {
+      updateData.organogram = req.files.organogram[0].filename;
+    }
+
     let profile = await HospitalProfile.findOneAndUpdate(
       { userId },
-      { mission: sanitizeInput(mission), vision: sanitizeInput(vision), serviceCharter: sanitizeInput(serviceCharter) },
+      { $set: updateData },
       { new: true, upsert: true }
     );
+    res.status(200).json(profile);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.uploadTechnicalPlan = async (req, res, next) => {
+  try {
+    const userId = req.user ? req.user._id.toString() : null;
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const { title, description } = req.body;
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required for technical plan' });
+    }
+
+    const technicalPlan = {
+      title: sanitizeInput(title),
+      description: sanitizeInput(description),
+      fileUrl: req.file.filename,
+      fileType: req.file.mimetype
+    };
+
+    const profile = await HospitalProfile.findOneAndUpdate(
+      { userId },
+      { $push: { technicalPlans: technicalPlan } },
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json(profile);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteTechnicalPlan = async (req, res, next) => {
+  try {
+    const userId = req.user ? req.user._id.toString() : null;
+    const { planId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const profile = await HospitalProfile.findOneAndUpdate(
+      { userId },
+      { $pull: { technicalPlans: { _id: planId } } },
+      { new: true }
+    );
+
     res.status(200).json(profile);
   } catch (err) {
     next(err);
@@ -267,6 +369,20 @@ exports.generateReport = async (req, res, next) => {
     `;
 
     res.status(200).json({ report });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Report Controllers
+exports.getAllReports = async (req, res, next) => {
+  try {
+    const userId = req.query.userId || (req.user ? req.user._id.toString() : null);
+    // If you want to filter by user, uncomment the next line
+    // const query = userId ? { userId } : {};
+    // For now, fetch all reports
+    const reports = await Report.find(userId ? { userId } : {});
+    res.status(200).json(reports);
   } catch (err) {
     next(err);
   }

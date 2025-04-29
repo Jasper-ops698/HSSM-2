@@ -6,11 +6,12 @@ const {
     createIncident, getAllIncidents,
     createAsset, getAllAssets,
     createTask, getAllTasks,
-    createMeterReading, getAllMeterReadings,
-    generateReport,
-    getHospitalProfile, updateHospitalProfile
+    createMeterReading, getAllMeterReadings, getMeterReadingTrend,
+    generateReport, getAllReports,
+    getHospitalProfile, updateHospitalProfile,
+    uploadTechnicalPlan, deleteTechnicalPlan
 } = require('../controllers/HssmController');
-const { Incident, Asset, Task, MeterReading, HospitalProfile } = require('../models/Hssm');
+const { Incident, Asset, Task, MeterReading, HospitalProfile, upload } = require('../models/Hssm');
 
 const router = express.Router();
 
@@ -99,18 +100,40 @@ Please provide:
     }
 });
 
-// Existing routes
+// Hospital Level Routes
 router.get('/hospitalLevels/:level/services', protect, getServicesByLevel);
+
+// Incident Routes
 router.post('/incidents', protect, createIncident);
 router.get('/incidents', protect, getAllIncidents);
+
+// Asset Routes
 router.post('/assets', protect, createAsset);
 router.get('/assets', protect, getAllAssets);
+
+// Task Routes
 router.post('/tasks', protect, createTask);
 router.get('/tasks', protect, getAllTasks);
+
+// Meter Reading Routes
 router.post('/meterReadings', protect, createMeterReading);
 router.get('/meterReadings', protect, getAllMeterReadings);
-router.post('/report', protect, generateReport);
+
+// Meter Reading Trend Route
+router.get('/meterReadings/trend', protect, getMeterReadingTrend);
+
+// Report Routes
+router.post('/report/generate', protect, generateReport);
+router.get('/reports', protect, getAllReports);
+
+// Hospital Profile Routes
 router.get('/profile', protect, getHospitalProfile);
-router.put('/profile', protect, updateHospitalProfile);
+router.put('/profile', protect, upload.fields([
+    { name: 'organogram', maxCount: 1 }
+]), protect, updateHospitalProfile);
+
+// Technical Plans Routes
+router.post('/profile/technical-plans', protect, upload.single('file'), uploadTechnicalPlan);
+router.delete('/profile/technical-plans/:planId', protect, deleteTechnicalPlan);
 
 module.exports = router;

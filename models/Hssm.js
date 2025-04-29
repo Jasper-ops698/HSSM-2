@@ -56,9 +56,26 @@ const reportSchema = new mongoose.Schema({
 // Define hospitalProfile schema for mission, vision, and service charter
 const hospitalProfileSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
+    hospitalName: { type: String, default: '' },
+    establishedDate: { type: Date },
+    location: {
+        address: { type: String, default: '' },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        country: { type: String, default: '' },
+        postalCode: { type: String, default: '' }
+    },
     mission: { type: String, default: '' },
     vision: { type: String, default: '' },
     serviceCharter: { type: String, default: '' },
+    organogram: { type: String }, // Will store the file path
+    technicalPlans: [{ 
+        title: { type: String, required: true },
+        description: { type: String },
+        fileUrl: { type: String, required: true },
+        uploadDate: { type: Date, default: Date.now },
+        fileType: { type: String }
+    }]
 });
 
 // Models
