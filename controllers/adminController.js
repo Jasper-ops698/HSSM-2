@@ -127,3 +127,19 @@ exports.getAllReportsByHSSMProviders = async (req, res) => {
     res.status(500).json({ msg: 'Error fetching reports', error: error.message });
   }
 };
+
+// Delete any user by ID (admin only)
+exports.deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found.' });
+    }
+    await user.deleteOne();
+    res.json({ msg: 'User deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ msg: 'Error deleting user', error: error.message });
+  }
+};

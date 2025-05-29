@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders } = require('../controllers/adminController');
+const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders, deleteUser } = require('../controllers/adminController');
 
 // Add a service provider
 router.post('/addProvider', addServiceProvider);
@@ -25,5 +25,8 @@ router.get('/analytics', getAllData);
 
 // Fetch all HSSM provider reports
 router.get('/hssmProviderReports', getAllReportsByHSSMProviders);
+
+// Delete a user
+router.delete('/users/:id', deleteUser);
 
 module.exports = router;

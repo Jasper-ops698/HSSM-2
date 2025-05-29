@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema(
       type: String, 
       required: false 
     }, // For FCM device token
+    isDisabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
