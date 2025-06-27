@@ -27,6 +27,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "openai": "^4.77.0",
+    "qrcode": "^1.5.4",
     "react-chartjs-2": "^5.3.0",
     "sanitize-html": "^2.16.0",
     "speakeasy": "^2.0.0",
