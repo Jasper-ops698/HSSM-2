@@ -51,4 +51,15 @@ router.post('/validate', async (req, res) => {
   res.json({ success: true, message: '2FA validated.' });
 });
 
+// Step 4: Disable 2FA for user
+router.post('/disable', requireAuth, async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+  if (!user.twoFactorEnabled) return res.status(400).json({ success: false, message: '2FA is not enabled.' });
+  user.twoFactorEnabled = false;
+  user.twoFactorSecret = undefined;
+  await user.save();
+  res.json({ success: true, message: '2FA disabled.' });
+});
+
 module.exports = router;
