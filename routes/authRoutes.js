@@ -14,10 +14,10 @@ router.post('/logout', (req, res) => {
 });
 
 // Update user profile (name, email)
-router.put('/profile', require('../middlewares/authMiddleware').protect, require('..//controllers/authController').updateProfile);
+router.put('/profile', require('../middlewares/authMiddleware').protect, require('../controllers/authController').updateProfile);
 
 // Change password
-router.put('/change-password', require('../middlewares/authMiddleware').protect, require('..//controllers/authController').changePassword);
+router.put('/change-password', require('../middlewares/authMiddleware').protect, require('../controllers/authController').changePassword);
 
 // Get user profile info (including 2FA status)
 router.get('/profile', require('../middlewares/authMiddleware').protect, getProfile);
