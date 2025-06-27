@@ -4,6 +4,7 @@ const generateToken = require('../utils/generateToken');
 const { validationResult } = require('express-validator');
 const nodemailer = require('nodemailer');
 const dotenv = require('dotenv');
+const speakeasy = require('speakeasy');
 dotenv.config();
 
 // Create a reusable transporter object for sending emails
@@ -61,7 +62,7 @@ const loginUser = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { email, password } = req.body;
+  const { email, password, twoFactorToken } = req.body;
 
   try {
     const user = await User.findOne({ email });
@@ -75,6 +76,27 @@ const loginUser = async (req, res) => {
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // 2FA logic
+    if (user.twoFactorEnabled) {
+      if (!twoFactorToken) {
+        // 2FA required but not provided
+        return res.status(206).json({
+          twoFactorRequired: true,
+          message: 'Two-factor authentication code required.',
+          userId: user._id,
+        });
+      }
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: 'base32',
+        token: twoFactorToken,
+        window: 1
+      });
+      if (!verified) {
+        return res.status(401).json({ message: 'Invalid two-factor authentication code.' });
+      }
     }
 
     const token = generateToken(user._id, user.email, user.name, user.phone, user.role);
@@ -203,6 +225,17 @@ const changePassword = async (req, res) => {
   }
 };
 
+// Get user profile
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id || req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching profile.' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -210,4 +243,5 @@ module.exports = {
   DeviceToken,
   updateProfile,
   changePassword,
+  getProfile,
 };

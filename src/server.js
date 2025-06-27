@@ -63,7 +63,7 @@ const corsOptions = {
       callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
   credentials: true,
   exposedHeaders: ['Content-Range', 'X-Content-Range']
@@ -75,6 +75,10 @@ app.use(cors(corsOptions));
 // Explicitly handle preflight (OPTIONS) requests
 // This ensures OPTIONS requests get the correct CORS headers before the actual request
 app.options("*", cors(corsOptions));
+
+// Allow CORS preflight for DELETE on reports endpoints
+app.options('/api/admin/hssmProviderReports/:id', cors(corsOptions));
+// If you have other report delete endpoints, add them here as well
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -110,6 +114,7 @@ connectToDatabase()
     const adminRoutes = require("../routes/adminRoutes");
     const HssmRoutes = require("../routes/HssmRoutes");
     const chatRoutes = require('../routes/chatRoutes');
+    const twofaRoutes = require('../routes/twofaRoutes');
 
     // --- API Route Middleware ---
     app.use("/api/auth", authRoutes);
@@ -119,6 +124,7 @@ connectToDatabase()
     app.use("/api/admin", adminRoutes);
     app.use("/api/hssm", HssmRoutes);
     app.use('/api/chat', chatRoutes);
+    app.use('/api/2fa', twofaRoutes);
 
     // --- Gemini AI Routes ---
     // (Keeping the Gemini routes as you provided them)

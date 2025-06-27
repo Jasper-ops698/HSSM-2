@@ -1,5 +1,5 @@
 const express = require('express');
-const { registerUser, loginUser, forgotPassword, DeviceToken } = require('../controllers/authController');
+const { registerUser, loginUser, forgotPassword, DeviceToken, getProfile } = require('../controllers/authController');
 const router = express.Router();
 
 router.post('/signup', registerUser);
@@ -18,5 +18,8 @@ router.put('/profile', require('../middlewares/authMiddleware').protect, require
 
 // Change password
 router.put('/change-password', require('../middlewares/authMiddleware').protect, require('..//controllers/authController').changePassword);
+
+// Get user profile info (including 2FA status)
+router.get('/profile', require('../middlewares/authMiddleware').protect, getProfile);
 
 module.exports = router;

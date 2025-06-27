@@ -143,3 +143,19 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ msg: 'Error deleting user', error: error.message });
   }
 };
+
+// Delete an HSSM provider report by ID
+exports.deleteHssmProviderReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { Request } = require('../models/Request');
+    const deleted = await Request.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Report not found.' });
+    }
+    res.json({ success: true, message: 'Report deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    res.status(500).json({ success: false, message: 'Error deleting report', error: error.message });
+  }
+};
