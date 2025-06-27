@@ -29,6 +29,7 @@
     "openai": "^4.77.0",
     "react-chartjs-2": "^5.3.0",
     "sanitize-html": "^2.16.0",
+    "speakeasy": "^2.0.0",
     "vercel": "^39.2.2",
     "winston": "^3.17.0"
   }
