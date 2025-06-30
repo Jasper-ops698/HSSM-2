@@ -159,3 +159,53 @@ exports.deleteHssmProviderReport = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error deleting report', error: error.message });
   }
 };
+
+// Disable a service provider by ID
+exports.disableServiceProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user || user.role !== 'service-provider') {
+      return res.status(404).json({ msg: 'Service provider not found.' });
+    }
+    user.isDisabled = true;
+    await user.save();
+    res.json({ msg: 'Service provider disabled successfully.' });
+  } catch (error) {
+    console.error('Error disabling service provider:', error);
+    res.status(500).json({ msg: 'Error disabling service provider', error: error.message });
+  }
+};
+
+// Disable an HSSM provider by ID
+exports.disableHssmProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user || user.role !== 'HSSM-provider') {
+      return res.status(404).json({ msg: 'HSSM provider not found.' });
+    }
+    user.isDisabled = true;
+    await user.save();
+    res.json({ msg: 'HSSM provider disabled successfully.' });
+  } catch (error) {
+    console.error('Error disabling HSSM provider:', error);
+    res.status(500).json({ msg: 'Error disabling HSSM provider', error: error.message });
+  }
+};
+
+// Delete an HSSM provider by ID
+exports.deleteHssmProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user || user.role !== 'HSSM-provider') {
+      return res.status(404).json({ msg: 'HSSM provider not found.' });
+    }
+    await user.deleteOne();
+    res.json({ msg: 'HSSM provider deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting HSSM provider:', error);
+    res.status(500).json({ msg: 'Error deleting HSSM provider', error: error.message });
+  }
+};

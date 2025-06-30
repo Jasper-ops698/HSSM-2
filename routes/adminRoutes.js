@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders, deleteUser, deleteHssmProviderReport } = require('../controllers/adminController');
+const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders, deleteUser, deleteHssmProviderReport, disableServiceProvider, deleteHssmProvider, disableHssmProvider } = require('../controllers/adminController');
 
 // Add a service provider
 router.post('/addProvider', addServiceProvider);
@@ -9,16 +9,16 @@ router.post('/addProvider', addServiceProvider);
 router.delete('/serviceProvider/:id', deleteServiceProvider);
 
 // Disable a service provider
-router.put('/serviceProvider/:id/disable', getAllData);
+router.put('/serviceProvider/:id/disable', disableServiceProvider);
 
 // Delete an HSSM provider
-router.delete('/hssmProvider/:id', getAllData);
+router.delete('/hssmProvider/:id', deleteHssmProvider);
 
 // Disable an HSSM provider
-router.put('/hssmProvider/:id/disable', getAllData);
+router.put('/hssmProvider/:id/disable', disableHssmProvider);
 
 // Fetch all reports of a specific HSSM provider based on ID
-router.get('/hssmProviderReports/:providerId', getAllData);
+router.get('/hssmProviderReports/:providerId', getAllData); // If you want a specific handler, replace getAllData
 
 // Fetch analytics data
 router.get('/analytics', getAllData);
