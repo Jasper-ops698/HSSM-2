@@ -3,10 +3,10 @@ const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const User = require('../models/User');
 const router = express.Router();
-const requireAuth = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
 // Step 1: Generate 2FA secret and QR code for user
-router.post('/generate', requireAuth, async (req, res) => {
+router.post('/generate', protect, async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
   if (user.twoFactorEnabled) return res.status(400).json({ success: false, message: '2FA already enabled.' });
@@ -20,7 +20,7 @@ router.post('/generate', requireAuth, async (req, res) => {
 });
 
 // Step 2: Verify 2FA code and enable 2FA
-router.post('/verify', requireAuth, async (req, res) => {
+router.post('/verify', protect, async (req, res) => {
   const { token } = req.body;
   const user = await User.findById(req.user.id);
   if (!user || !user.twoFactorSecret) return res.status(400).json({ success: false, message: '2FA not initialized.' });
@@ -52,7 +52,7 @@ router.post('/validate', async (req, res) => {
 });
 
 // Step 4: Disable 2FA for user
-router.post('/disable', requireAuth, async (req, res) => {
+router.post('/disable', protect, async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
   if (!user.twoFactorEnabled) return res.status(400).json({ success: false, message: '2FA is not enabled.' });
