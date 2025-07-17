@@ -115,9 +115,11 @@ connectToDatabase()
     const HssmRoutes = require("../routes/HssmRoutes");
     const chatRoutes = require('../routes/chatRoutes');
     const twofaRoutes = require('../routes/twofaRoutes');
+    const googleAuthRoutes = require('../routes/googleAuthRoutes');
 
     // --- API Route Middleware ---
     app.use("/api/auth", authRoutes);
+    app.use("/api/auth", googleAuthRoutes); // Add Google Auth route
     app.use("/api/services", serviceRoutes);
     app.use("/api/requests", requestRoutes);
     app.use("/api/dashboard", dashboardRoutes);
