@@ -148,7 +148,7 @@ exports.deleteUser = async (req, res) => {
 exports.deleteHssmProviderReport = async (req, res) => {
   try {
     const { id } = req.params;
-    const { Request } = require('../models/Request');
+    const Request = require('../models/Request');
     const deleted = await Request.findByIdAndDelete(id);
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'Report not found.' });
