@@ -27,7 +27,7 @@ const generateToken = (userId, email, name, phone, role = 'user') => {
     const token = jwt.sign(payload, secretKey, { expiresIn });
     return token;  // Directly return the token as a string
   } catch (error) {
-    console.error('Error generating token:', error);
+
     throw new Error('Error generating the JWT token');
   }
 };

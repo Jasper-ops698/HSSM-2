@@ -45,7 +45,7 @@ exports.getAllData = async (req, res) => {
       servicesCount,
     });
   } catch (error) {
-    console.error('Error fetching data:', error);
+
     res.status(500).json({ msg: 'Error fetching data', error: error.message });
   }
 };
@@ -64,7 +64,7 @@ exports.deleteServiceProvider = async (req, res) => {
     await serviceProvider.deleteOne();
     res.json({ msg: 'Service provider deleted successfully.' });
   } catch (error) {
-    console.error('Error deleting service provider:', error);
+
     res.status(500).json({ msg: 'Error deleting service provider', error: error.message });
   }
 };
@@ -102,7 +102,7 @@ exports.addServiceProvider = async (req, res) => {
     await newServiceProvider.save();
     res.status(201).json({ msg: 'Service provider added successfully.' });
   } catch (error) {
-    console.error('Error adding service provider:', error);
+
     res.status(500).json({ msg: 'Error adding service provider', error: error.message });
   }
 };
@@ -123,7 +123,7 @@ exports.getAllReportsByHSSMProviders = async (req, res) => {
       reports,
     });
   } catch (error) {
-    console.error('Error fetching reports:', error);
+
     res.status(500).json({ msg: 'Error fetching reports', error: error.message });
   }
 };
@@ -139,7 +139,7 @@ exports.deleteUser = async (req, res) => {
     await user.deleteOne();
     res.json({ msg: 'User deleted successfully.' });
   } catch (error) {
-    console.error('Error deleting user:', error);
+
     res.status(500).json({ msg: 'Error deleting user', error: error.message });
   }
 };
@@ -155,7 +155,7 @@ exports.deleteHssmProviderReport = async (req, res) => {
     }
     res.json({ success: true, message: 'Report deleted successfully.' });
   } catch (error) {
-    console.error('Error deleting report:', error);
+
     res.status(500).json({ success: false, message: 'Error deleting report', error: error.message });
   }
 };
@@ -172,7 +172,7 @@ exports.disableServiceProvider = async (req, res) => {
     await user.save();
     res.json({ msg: 'Service provider disabled successfully.' });
   } catch (error) {
-    console.error('Error disabling service provider:', error);
+
     res.status(500).json({ msg: 'Error disabling service provider', error: error.message });
   }
 };
@@ -189,7 +189,7 @@ exports.disableHssmProvider = async (req, res) => {
     await user.save();
     res.json({ msg: 'HSSM provider disabled successfully.' });
   } catch (error) {
-    console.error('Error disabling HSSM provider:', error);
+
     res.status(500).json({ msg: 'Error disabling HSSM provider', error: error.message });
   }
 };
@@ -205,7 +205,7 @@ exports.deleteHssmProvider = async (req, res) => {
     await user.deleteOne();
     res.json({ msg: 'HSSM provider deleted successfully.' });
   } catch (error) {
-    console.error('Error deleting HSSM provider:', error);
+
     res.status(500).json({ msg: 'Error deleting HSSM provider', error: error.message });
   }
 };

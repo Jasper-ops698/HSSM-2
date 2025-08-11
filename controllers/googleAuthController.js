@@ -32,7 +32,7 @@ const googleAuth = async (req, res) => {
     const token = generateToken(user._id, user.email, user.name, user.phone, user.role);
     res.json({ token, user: user.toJSON() });
   } catch (err) {
-    console.error('Google Auth error:', err);
+
     res.status(401).json({ message: 'Invalid Google token' });
   }
 };

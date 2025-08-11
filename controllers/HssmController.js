@@ -230,7 +230,8 @@ exports.updateHospitalProfile = async (req, res, next) => {
       return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    const { 
+
+    let { 
       hospitalName, 
       establishedDate, 
       location, 
@@ -238,6 +239,15 @@ exports.updateHospitalProfile = async (req, res, next) => {
       vision, 
       serviceCharter 
     } = req.body;
+
+    // If location is a string (from FormData), parse it
+    if (typeof location === 'string') {
+      try {
+        location = JSON.parse(location);
+      } catch (e) {
+        location = { address: '', city: '', state: '', country: '', postalCode: '' };
+      }
+    }
 
     const updateData = {
       hospitalName: sanitizeInput(hospitalName),

@@ -52,14 +52,14 @@ if (process.env.ALLOWED_ORIGINS) {
   const additionalOrigins = process.env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim());
   allowedOrigins = [...allowedOrigins, ...additionalOrigins];
 }
-console.log("Allowed CORS Origins:", allowedOrigins);
+
 
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.error(`CORS Error: Origin '${origin}' not allowed:`, origin);
+
       callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
@@ -84,7 +84,7 @@ app.options('/api/admin/hssmProviderReports/:id', cors(corsOptions));
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log('Created uploads directory:', uploadsDir);
+
 }
 
 // Configure static file serving with CORS headers
@@ -98,12 +98,12 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '../uploads')));
 
-console.log(`Serving static files from: ${uploadsDir}`);
+
 
 // --- Database Connection and Route Setup ---
 connectToDatabase()
   .then(() => {
-    console.log("Successfully connected to the database.");
+
 
     // --- Import Routes ---
     // Ensure paths are correct relative to this file's location
@@ -170,14 +170,14 @@ connectToDatabase()
             report: aiResponse.data.candidates[0].content.parts[0].text,
           });
         } else {
-          console.error("Unexpected AI API response structure:", aiResponse.data);
+
           // Send back Gemini's error if available
           const errorMessage = aiResponse.data?.error?.message || "Failed to generate report: Unexpected AI response.";
           res.status(500).json({ success: false, message: errorMessage });
         }
       } catch (error) {
          // Pass error to the central error handler
-        console.error("Error in /api/gemini/report:", error.response?.data || error.message);
+
         next(error); // Forward error to the error handling middleware
       }
     });
@@ -189,7 +189,7 @@ connectToDatabase()
         if (!message) {
           return res.status(400).json({ success: false, message: "Message is required." });
         }
-        console.log("Received chat message:", message);
+
 
         const inputData = {
           contents: [ { parts: [ { text: message } ] } ],
@@ -209,13 +209,13 @@ connectToDatabase()
             response: aiResponse.data.candidates[0].content.parts[0].text,
           });
         } else {
-          console.error("Unexpected AI API chat response structure:", aiResponse.data);
+
            const errorMessage = aiResponse.data?.error?.message || "Failed to process chat: Unexpected AI response.";
           res.status(500).json({ success: false, message: errorMessage });
         }
       } catch (error) {
         // Pass error to the central error handler
-        console.error("Error in /api/gemini/chat:", error.response?.data || error.message);
+
         next(error); // Forward error to the error handling middleware
       }
     });
@@ -224,7 +224,7 @@ connectToDatabase()
     // Serve files from the 'uploads' directory (make sure this directory exists)
     // Creates a virtual path '/uploads' mapped to the physical './uploads' directory
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-    console.log(`Serving static files from: ${path.join(__dirname, '../uploads')}`);
+
 
     // --- Default Route ---
     // A simple welcome message for the root URL
@@ -243,7 +243,7 @@ connectToDatabase()
     // --- Central Error Handling Middleware ---
     // Must have 4 arguments (err, req, res, next) to be recognized as an error handler
     app.use((err, req, res, next) => {
-      console.error("Unhandled Error:", err.stack || err); // Log the full error stack
+
 
       // Check if the error is a CORS error
       if (err.message === "Not allowed by CORS") {
@@ -270,13 +270,12 @@ connectToDatabase()
     const PORT = process.env.PORT || 5000;
     // Listen on 0.0.0.0 to accept connections from any network interface (important for Render/Docker)
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server successfully started and running on http://localhost:${PORT} (accessible externally if configured)`);
+
     });
 
   })
   .catch((err) => {
     // Handle initial database connection errors
-    console.error("FATAL: Failed to connect to the database. Server cannot start.");
-    console.error(err);
+
     process.exit(1); // Exit the process with an error code
   });

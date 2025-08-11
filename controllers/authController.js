@@ -50,7 +50,7 @@ const registerUser = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Error registering user:', err);
+
     return res.status(500).json({ message: 'Error registering user' });
   }
 };
@@ -112,7 +112,7 @@ const loginUser = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Error logging in:', err);
+
     return res.status(500).json({ message: 'Error logging in' });
   }
 };
@@ -146,7 +146,7 @@ const forgotPassword = async (req, res) => {
 
     res.status(200).json({ message: 'Password reset email sent' });
   } catch (err) {
-    console.error('Error sending password reset email:', err);
+
     res.status(500).json({ message: 'Error sending password reset email' });
   }
 };
@@ -166,7 +166,7 @@ const DeviceToken = async (req, res) => {
   try {
     // Example: Save the device token to the database
     // Replace this with your actual database logic
-    console.log(`Saving device token for userId: ${userId}, deviceToken: ${deviceToken}`);
+
     // Simulate database save operation
     const result = { success: true }; // Replace with actual database operation
 
@@ -176,7 +176,7 @@ const DeviceToken = async (req, res) => {
 
     res.status(200).json({ message: 'Device token registered successfully.' });
   } catch (error) {
-    console.error('Error registering device token:', error);
+
     res.status(500).json({ message: 'An internal server error occurred.' });
   }
 };

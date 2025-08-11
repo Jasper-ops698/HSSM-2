@@ -3,28 +3,22 @@ const mongoose = require('mongoose');
 const requestSchema = new mongoose.Schema({
   user: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true 
+    ref: 'User' 
   },
   serviceType: { 
-    type: String, 
-    required: true 
+    type: String 
   },
   date: { 
-    type: Date, 
-    required: true 
+    type: Date 
   },
   time: { 
-    type: Date, 
-    required: true 
+    type: Date 
   },
   description: { 
-    type: String, 
-    required: true 
+    type: String 
   },
   location: { 
-    type: String, 
-    required: true 
+    type: String 
   },
   attachments: [{ 
     type: String // This will store file URLs or base64 data for attachments
