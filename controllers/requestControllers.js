@@ -1,13 +1,17 @@
 const mongoose = require('mongoose');
 const Request = require('../models/Request');
 const Service = require('../models/Service');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { HospitalProfile } = require('../models/Hssm');
+const sendFCMNotification = require('../utils/sendFCMNotification');
 
 /**
  * Create a new service request
  */
 exports.createRequest = async (req, res) => {
   try {
-    const { serviceType, date, time, description, location, attachments } = req.body;
+    const { serviceType, date, time, description, location, attachments, hssmProviderId } = req.body;
 
     if (!serviceType || !date || !time || !description || !location) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -31,17 +35,54 @@ exports.createRequest = async (req, res) => {
 
     await newRequest.save();
 
-    // Optionally send a notification to a service provider
-    const serviceProviderToken = ''; // Fetch provider token from your DB (you need to implement this)
-    const notificationMessage = {
-      notification: {
-        title: 'New Service Request',
-        body: `You have a new service request for ${serviceType}`,
-      },
-      token: serviceProviderToken,
-    };
+    // --- Notification Logic ---
+    // 1. Find the selected provider (service or HSSM)
+    let providerUser = null;
+    if (hssmProviderId) {
+      // HSSM provider selected
+      const hssmProfile = await HospitalProfile.findById(hssmProviderId);
+      if (hssmProfile) {
+        providerUser = await User.findOne({ _id: hssmProfile.userId });
+      }
+    } else {
+      // Regular service provider
+      const service = await Service.findById(serviceType);
+      if (service) {
+        providerUser = await User.findById(service.provider);
+      }
+    }
 
-    await sendFCMNotification(notificationMessage);
+    // 2. Find admin user
+    const adminUser = await User.findOne({ role: 'admin' });
+
+    // 3. Prepare notification recipients
+    const recipients = [];
+    if (providerUser && providerUser.deviceToken) recipients.push({ user: providerUser, type: 'service_request' });
+    if (adminUser && adminUser.deviceToken) recipients.push({ user: adminUser, type: 'admin_alert' });
+
+    // 4. Send notifications and save records
+    for (const recipient of recipients) {
+      const notificationMessage = {
+        notification: {
+          title: 'New Service Request',
+          body: `You have a new service request for ${serviceType}`,
+        },
+        token: recipient.user.deviceToken,
+      };
+      try {
+        await sendFCMNotification(notificationMessage);
+      } catch (err) {
+        console.error('FCM send error:', err);
+      }
+      // Save notification record
+      await Notification.create({
+        recipient: recipient.user._id,
+        type: recipient.type,
+        title: 'New Service Request',
+        message: `You have a new service request for ${serviceType}`,
+        data: { requestId: newRequest._id },
+      });
+    }
 
     res.status(201).json({ message: 'Service request created successfully', newRequest });
   } catch (error) {

@@ -1,3 +1,6 @@
+// List all HSSM providers for service request selection
+const { listHssmProviders } = require('../controllers/HssmController');
+router.get('/providers', protect, listHssmProviders);
 const express = require('express');
 const { protect } = require('../middlewares/authMiddleware');
 const axios = require('axios');

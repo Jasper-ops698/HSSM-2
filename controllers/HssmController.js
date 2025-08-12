@@ -1,3 +1,13 @@
+// List all HSSM providers (for service request selection)
+exports.listHssmProviders = async (req, res, next) => {
+  try {
+    // Find all hospital profiles and populate user info
+    const providers = await HospitalProfile.find().select('_id hospitalName userId');
+    res.status(200).json(providers);
+  } catch (err) {
+    next(err);
+  }
+};
 const { HospitalLevel, Incident, Asset, Task, MeterReading, Report, HospitalProfile } = require('../models/Hssm');
 const sanitizeHtml = require('sanitize-html');
 
