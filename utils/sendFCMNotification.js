@@ -2,7 +2,7 @@ const admin = require('firebase-admin');
 
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
-  const serviceAccount = require('../path/to/your/firebase-admin.json');
+  const serviceAccount = require('../firebase-admin.json');
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });

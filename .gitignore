@@ -17,6 +17,7 @@ Thumbs.db
 
 # dotenv
 .env
+firebase-admin.json
 
 # Directories for temporary files
 tmp/

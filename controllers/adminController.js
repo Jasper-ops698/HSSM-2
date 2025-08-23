@@ -1,3 +1,26 @@
+// Admin: Assign role to a user (service-provider: teacher, credit-controller, HOD)
+exports.assignUserRole = async (req, res) => {
+  try {
+    const { userId, role } = req.body;
+    // Only allow assigning teacher, credit-controller, HOD to service-providers
+    const allowedRoles = ['teacher', 'credit-controller', 'HOD'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ msg: 'Invalid role assignment.' });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found.' });
+    }
+    if (user.role !== 'service-provider') {
+      return res.status(400).json({ msg: 'Role can only be assigned to service-providers.' });
+    }
+    user.role = role;
+    await user.save();
+    res.json({ msg: `Role '${role}' assigned to user successfully.` });
+  } catch (error) {
+    res.status(500).json({ msg: 'Error assigning role', error: error.message });
+  }
+};
 const User = require('../models/User');
 const Request = require('../models/Request');
 const Service = require('../models/Service');

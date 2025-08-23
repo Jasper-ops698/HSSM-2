@@ -33,7 +33,16 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['individual', 'service-provider', 'admin', 'HSSM-provider'],
+      enum: [
+        'individual',
+        'service-provider',
+        'admin',
+        'HSSM-provider',
+        'student',
+        'teacher',
+        'credit-controller',
+        'HOD'
+      ],
       required: true,
       default: 'individual', // Default role is 'individual'
     },

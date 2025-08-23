@@ -1,3 +1,6 @@
+const { assignUserRole } = require('../controllers/adminController');
+// Assign role to a service-provider (teacher, credit-controller, HOD)
+router.post('/assignRole', assignUserRole);
 const express = require('express');
 const router = express.Router();
 const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders, deleteUser, deleteHssmProviderReport, disableServiceProvider, deleteHssmProvider, disableHssmProvider } = require('../controllers/adminController');
