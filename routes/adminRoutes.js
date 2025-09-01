@@ -1,5 +1,5 @@
 const { assignUserRole } = require('../controllers/adminController');
-// Assign role to a service-provider (teacher, credit-controller, HOD)
+// Assign role to a staff (teacher, credit-controller, HOD)
 router.post('/assignRole', assignUserRole);
 const express = require('express');
 const router = express.Router();

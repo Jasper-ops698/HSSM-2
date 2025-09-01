@@ -27,9 +27,9 @@ const app = express();
 connectToDatabase()
   .then(() => {
     // --- Import Routes ---
-    const serviceRoutes = require("../routes/serviceRoutes");
     const authRoutes = require("../routes/authRoutes");
-    const requestRoutes = require("../routes/requestRoutes");
+    const enrollmentRoutes = require("../routes/enrollmentRoutes");
+    const classRoutes = require("../routes/classRoutes");
     const dashboardRoutes = require("../routes/dashboardRoutes");
     const adminRoutes = require("../routes/adminRoutes");
     const HssmRoutes = require("../routes/HssmRoutes");
@@ -37,18 +37,34 @@ connectToDatabase()
     const twofaRoutes = require('../routes/twofaRoutes');
     const googleAuthRoutes = require('../routes/googleAuthRoutes');
     const absenceRoutes = require('../routes/absenceRoutes');
+    const notificationRoutes = require('../routes/notificationRoutes');
+    const studentRoutes = require('../routes/studentRoutes');
+    const teacherRoutes = require('../routes/teacherRoutes');
+    const hodRoutes = require('../routes/hodRoutes');
+    const creditRoutes = require('../routes/creditRoutes');
+    const hssmProviderRoutes = require('../routes/hssmProviderRoutes');
+    const reportRoutes = require('../routes/reportRoutes');
+    const announcementRoutes = require('../routes/announcementRoutes');
 
     // --- API Route Middleware ---
     app.use("/api/auth", authRoutes);
     app.use("/api/auth", googleAuthRoutes); // Add Google Auth route
-    app.use("/api/services", serviceRoutes);
-    app.use("/api/requests", requestRoutes);
+    app.use("/api/enrollments", enrollmentRoutes);
+    app.use("/api/classes", classRoutes);
     app.use("/api/dashboard", dashboardRoutes);
     app.use("/api/admin", adminRoutes);
     app.use("/api/hssm", HssmRoutes);
     app.use('/api/chat', chatRoutes);
     app.use('/api/2fa', twofaRoutes);
     app.use('/api/absences', absenceRoutes);
+    app.use('/api/notifications', notificationRoutes);
+    app.use('/api/student', studentRoutes);
+    app.use('/api/teacher', teacherRoutes);
+    app.use('/api/hod', hodRoutes);
+    app.use('/api/credit', creditRoutes);
+    app.use('/api/hssm-provider', hssmProviderRoutes);
+    app.use('/api/reports', reportRoutes);
+    app.use('/api/announcements', announcementRoutes);
 
     // --- Gemini AI Routes ---
     app.post("/api/gemini/report", async (req, res, next) => {

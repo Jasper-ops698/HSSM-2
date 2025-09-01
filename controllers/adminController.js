@@ -1,157 +1,127 @@
-// Admin: Assign role to a user (service-provider: teacher, credit-controller, HOD)
-exports.assignUserRole = async (req, res) => {
-  try {
-    const { userId, role } = req.body;
-    // Only allow assigning teacher, credit-controller, HOD to service-providers
-    const allowedRoles = ['teacher', 'credit-controller', 'HOD'];
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ msg: 'Invalid role assignment.' });
-    }
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ msg: 'User not found.' });
-    }
-    if (user.role !== 'service-provider') {
-      return res.status(400).json({ msg: 'Role can only be assigned to service-providers.' });
-    }
-    user.role = role;
-    await user.save();
-    res.json({ msg: `Role '${role}' assigned to user successfully.` });
-  } catch (error) {
-    res.status(500).json({ msg: 'Error assigning role', error: error.message });
-  }
-};
 const User = require('../models/User');
-const Request = require('../models/Request');
-const Service = require('../models/Service');
-const { validationResult } = require('express-validator');
+const Enrollment = require('../models/Enrollment');
+const Class = require('../models/Class');
+const Notification = require('../models/Notification');
 
-// Get all users, requests, and services for analytics
-exports.getAllData = async (req, res) => {
+// @desc    Get all data for admin dashboard analytics
+// @route   GET /api/admin/data
+// @access  Private/Admin
+exports.getDashboardAnalytics = async (req, res) => {
   try {
-    const [users, requests, services] = await Promise.all([
+    const [users, enrollments, classes] = await Promise.all([
       User.find(),
-      Request.find(),
-      Service.find(),
+      Enrollment.find(),
+      Class.find(),
     ]);
 
-    // Preparing data for analytics
+    // Prepare data for analytics
     const totalUsers = users.length;
-    const totalRequests = requests.length;
-    const totalServices = services.length;
+    const totalEnrollments = enrollments.length;
+    const totalClasses = classes.length;
 
-    // Pie charts data preparation
     const userRoles = users.reduce((acc, user) => {
       acc[user.role] = (acc[user.role] || 0) + 1;
       return acc;
     }, {});
 
-    const requestStatuses = requests.reduce((acc, request) => {
-      acc[request.status] = (acc[request.status] || 0) + 1;
+    const enrollmentStatuses = enrollments.reduce((acc, enrollment) => {
+      acc[enrollment.status] = (acc[enrollment.status] || 0) + 1;
       return acc;
     }, {});
 
-    const servicesCount = services.reduce((acc, service) => {
-      acc[service.name] = (acc[service.name] || 0) + 1;
+    const classesPerDepartment = classes.reduce((acc, cls) => {
+      acc[cls.department] = (acc[cls.department] || 0) + 1;
       return acc;
     }, {});
 
     res.json({
-      users,
-      requests,
-      services,
       totalUsers,
-      totalRequests,
-      totalServices,
+      totalEnrollments,
+      totalClasses,
       userRoles,
-      requestStatuses,
-      servicesCount,
+      enrollmentStatuses,
+      classesPerDepartment,
+      users, // For user management list
+      classes, // For class management list
     });
   } catch (error) {
-
-    res.status(500).json({ msg: 'Error fetching data', error: error.message });
+    res.status(500).json({ msg: 'Error fetching admin dashboard data', error: error.message });
   }
 };
 
-// Delete a service provider by ID
-exports.deleteServiceProvider = async (req, res) => {
+// @desc    Admin creates a new staff user (teacher, HOD, etc.)
+// @route   POST /api/admin/create-staff
+// @access  Private/Admin
+exports.createStaffUser = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { name, email, password, role, department } = req.body;
 
-    const serviceProvider = await User.findById(id);
-    if (!serviceProvider) {
-      return res.status(404).json({ msg: 'Service provider not found.' });
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ msg: 'Name, email, password, and role are required.' });
     }
 
-    // Remove service provider
-    await serviceProvider.deleteOne();
-    res.json({ msg: 'Service provider deleted successfully.' });
-  } catch (error) {
-
-    res.status(500).json({ msg: 'Error deleting service provider', error: error.message });
-  }
-};
-
-// Add a new service provider
-exports.addServiceProvider = async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-
-    // Validate input
-    if (!name || !email || !password) {
-      return res.status(400).json({ msg: 'All fields are required.' });
+    if ((role === 'teacher' || role === 'HOD') && !department) {
+      return res.status(400).json({ msg: 'Department is required for teachers and HODs.' });
     }
 
-    // Check if the service provider already exists
-    const existingServiceProvider = await User.findOne({ email });
-    if (existingServiceProvider) {
-      // If the service provider exists but is disabled, enable them
-      if (existingServiceProvider.disabled) {
-        existingServiceProvider.disabled = false;
-        await existingServiceProvider.save();
-        return res.status(200).json({ msg: 'Service provider re-enabled successfully.' });
-      }
-      return res.status(400).json({ msg: 'Service provider with this email already exists.' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ msg: 'User with this email already exists.' });
     }
 
-    // Create a new service provider
-    const newServiceProvider = new User({
+    const newUser = new User({
       name,
       email,
-      password,
-      role: 'service-provider',
+      password, // Password will be hashed by the pre-save hook in the User model
+      role,
+      department: (role === 'teacher' || role === 'HOD') ? department : undefined,
     });
 
-    await newServiceProvider.save();
-    res.status(201).json({ msg: 'Service provider added successfully.' });
+    await newUser.save();
+    res.status(201).json({ msg: 'Staff user created successfully.', user: newUser });
   } catch (error) {
-
-    res.status(500).json({ msg: 'Error adding service provider', error: error.message });
+    res.status(500).json({ msg: 'Error creating staff user', error: error.message });
   }
 };
 
-// Get all reports generated by HSSM providers
-exports.getAllReportsByHSSMProviders = async (req, res) => {
+// @desc    Admin assigns a role and department to a user
+// @route   POST /api/admin/assign-role
+// @access  Private/Admin
+exports.assignRoleAndDepartment = async (req, res) => {
   try {
-    const hssmProviders = await User.find({ role: 'HSSM-provider' });
+    const { userId, role, department } = req.body;
 
-    const reports = await Promise.all(
-      hssmProviders.map(provider => 
-        Request.find({ providerId: provider._id })
-      )
-    );
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found.' });
+    }
 
-    res.json({
-      hssmProviders,
-      reports,
+    if ((role === 'teacher' || role === 'HOD') && !department) {
+      return res.status(400).json({ msg: 'Department is required for this role.' });
+    }
+
+    user.role = role;
+    if (department) {
+      user.department = department;
+    }
+    
+    await user.save();
+
+    await Notification.create({
+      recipient: user._id,
+      message: `Your role has been updated to ${role}.`,
+      type: 'role_assigned',
     });
-  } catch (error) {
 
-    res.status(500).json({ msg: 'Error fetching reports', error: error.message });
+    res.json({ msg: 'User role and department updated successfully.' });
+  } catch (error) {
+    res.status(500).json({ msg: 'Error assigning role', error: error.message });
   }
 };
 
-// Delete any user by ID (admin only)
+// @desc    Admin deletes any user by ID
+// @route   DELETE /api/admin/user/:id
+// @access  Private/Admin
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -159,76 +129,34 @@ exports.deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: 'User not found.' });
     }
+    // Add check to prevent admin from deleting themselves
+    if (user._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({ msg: 'Admin cannot delete themselves.' });
+    }
     await user.deleteOne();
     res.json({ msg: 'User deleted successfully.' });
   } catch (error) {
-
     res.status(500).json({ msg: 'Error deleting user', error: error.message });
   }
 };
 
-// Delete an HSSM provider report by ID
-exports.deleteHssmProviderReport = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const Request = require('../models/Request');
-    const deleted = await Request.findByIdAndDelete(id);
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: 'Report not found.' });
-    }
-    res.json({ success: true, message: 'Report deleted successfully.' });
-  } catch (error) {
-
-    res.status(500).json({ success: false, message: 'Error deleting report', error: error.message });
-  }
-};
-
-// Disable a service provider by ID
-exports.disableServiceProvider = async (req, res) => {
+// @desc    Admin disables or enables any user by ID
+// @route   POST /api/admin/user/:id/toggle-disable
+// @access  Private/Admin
+exports.toggleUserDisabled = async (req, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
-    if (!user || user.role !== 'service-provider') {
-      return res.status(404).json({ msg: 'Service provider not found.' });
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found.' });
     }
-    user.isDisabled = true;
+     if (user._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({ msg: 'Admin cannot disable themselves.' });
+    }
+    user.isDisabled = !user.isDisabled;
     await user.save();
-    res.json({ msg: 'Service provider disabled successfully.' });
+    res.json({ msg: `User ${user.isDisabled ? 'disabled' : 'enabled'} successfully.` });
   } catch (error) {
-
-    res.status(500).json({ msg: 'Error disabling service provider', error: error.message });
-  }
-};
-
-// Disable an HSSM provider by ID
-exports.disableHssmProvider = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findById(id);
-    if (!user || user.role !== 'HSSM-provider') {
-      return res.status(404).json({ msg: 'HSSM provider not found.' });
-    }
-    user.isDisabled = true;
-    await user.save();
-    res.json({ msg: 'HSSM provider disabled successfully.' });
-  } catch (error) {
-
-    res.status(500).json({ msg: 'Error disabling HSSM provider', error: error.message });
-  }
-};
-
-// Delete an HSSM provider by ID
-exports.deleteHssmProvider = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findById(id);
-    if (!user || user.role !== 'HSSM-provider') {
-      return res.status(404).json({ msg: 'HSSM provider not found.' });
-    }
-    await user.deleteOne();
-    res.json({ msg: 'HSSM provider deleted successfully.' });
-  } catch (error) {
-
-    res.status(500).json({ msg: 'Error deleting HSSM provider', error: error.message });
+    res.status(500).json({ msg: 'Error toggling user status', error: error.message });
   }
 };

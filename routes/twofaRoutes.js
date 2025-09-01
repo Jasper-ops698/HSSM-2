@@ -62,4 +62,18 @@ router.post('/disable', protect, async (req, res) => {
   res.json({ success: true, message: '2FA disabled.' });
 });
 
+// Get 2FA status for the current user
+router.get('/status', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+    res.json({ success: true, twoFactorEnabled: user.twoFactorEnabled });
+  } catch (error) {
+    console.error('Error fetching 2FA status:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching 2FA status.' });
+  }
+});
+
 module.exports = router;

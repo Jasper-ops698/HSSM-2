@@ -1,0 +1,55 @@
+const User = require('../models/User');
+const Class = require('../models/Class');
+const Timetable = require('../models/Timetable');
+const Notification = require('../models/Notification');
+const Announcement = require('../models/Announcement');
+
+// @desc    Get all data for the student dashboard
+// @route   GET /api/student/dashboard
+// @access  Private (Student)
+exports.getDashboardData = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const studentDepartment = req.user.department;
+
+    // Find classes the student is enrolled in
+    const studentClasses = await Class.find({ students: studentId }).populate('teacher', 'name');
+
+    // Get class IDs
+    const classIds = studentClasses.map(c => c._id);
+
+    // Find timetables for those classes
+    const timetables = await Timetable.find({ classId: { $in: classIds } });
+
+    // Get recent notifications for the student
+    const notifications = await Notification.find({ userId: studentId }).sort({ createdAt: -1 }).limit(5);
+
+    // Get relevant announcements
+    const currentDate = new Date();
+    const announcements = await Announcement.find({
+      active: true,
+      startDate: { $lte: currentDate },
+      $or: [
+        { endDate: null },
+        { endDate: { $gte: currentDate } }
+      ],
+      $or: [
+        { targetRoles: 'all' },
+        { targetRoles: 'student' },
+        { department: studentDepartment }
+      ]
+    })
+    .sort({ priority: -1, createdAt: -1 })
+    .limit(5);
+
+    res.json({
+      classes: studentClasses,
+      timetables,
+      notifications,
+      announcements
+    });
+  } catch (error) {
+    console.error('Error fetching student dashboard data:', error);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+};

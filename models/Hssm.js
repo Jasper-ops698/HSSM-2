@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
+const Notification = require('./Notification'); // Import Notification model
+const User = require('./User'); // Import User model
 
 // Define hospitalLevels schema
 const hospitalLevelSchema = new mongoose.Schema({
@@ -17,7 +19,35 @@ const incidentSchema = new mongoose.Schema({
     priority: { type: String, enum: ['Low', 'Medium', 'High'], required: true }, // Priority level
     date: { type: Date, required: true }, // Date of the incident
     file: { type: String }, // File attachment (optional)
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Link incident to a user/facility
 });
+
+// Post-save hook to create notifications for high-priority incidents
+incidentSchema.post('save', async function (doc, next) {
+    // We only trigger on creation of a new document, not on update
+    if (this.isNew && doc.priority === 'High') {
+        try {
+            // Find all users with the 'HSSM-provider' role.
+            // In a more complex app, you might find a provider linked to the incident's user/facility.
+            const hssmProviders = await User.find({ role: 'HSSM-provider' });
+
+            if (hssmProviders.length > 0) {
+                const notifications = hssmProviders.map(provider => ({
+                    user: provider._id,
+                    message: `New high-priority incident logged: "${doc.title}"`,
+                    type: 'incident',
+                    link: `/incidents/${doc._id}` // A link to view the incident (frontend route)
+                }));
+                await Notification.insertMany(notifications);
+            }
+        } catch (error) {
+            console.error('Error creating notification for high-priority incident:', error);
+            // We don't want to fail the main operation, so we just log the error.
+        }
+    }
+    next();
+});
+
 
 // Define asset schema
 const assetSchema = new mongoose.Schema({
@@ -27,6 +57,7 @@ const assetSchema = new mongoose.Schema({
     location: { type: String, required: true }, // Location of the asset
     serviceRecords: { type: String }, // Service records (optional), renamed from 'service records'
     file: { type: String }, // File attachment (optional)
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 });
 
 // Define task schema
@@ -38,14 +69,19 @@ const taskSchema = new mongoose.Schema({
     priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' }, // Priority level with default
     taskDescription: { type: String }, // Task description, renamed from 'task description'
     file: { type: String }, // File attachment (optional)
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 });
+
+// NOTE: To implement notifications for tasks nearing their due date,
+// a scheduled job (using a library like node-cron) would be required to run periodically (e.g., daily)
+// and check for tasks with upcoming deadlines. This is a good future enhancement.
 
 // Define meterReading schema with flattened structure and userId
 const meterReadingSchema = new mongoose.Schema({
     location: { type: String, required: true },
     reading: { type: Number, required: true },
     date: { type: Date, required: true },
-    userId: { type: String, required: true }
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });
 
 // Define report schema
@@ -69,7 +105,7 @@ const hospitalProfileSchema = new mongoose.Schema({
     vision: { type: String, default: '' },
     serviceCharter: { type: String, default: '' },
     organogram: { type: String }, // Will store the file path
-    technicalPlans: [{ 
+    technicalPlans: [{
         title: { type: String, required: true },
         description: { type: String },
         fileUrl: { type: String, required: true },
@@ -87,6 +123,21 @@ const MeterReading = mongoose.model('MeterReading', meterReadingSchema);
 const Report = mongoose.model('Report', reportSchema);
 const HospitalProfile = mongoose.model('HospitalProfile', hospitalProfileSchema);
 
+const GeneratedReportSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    markdownContent: { type: String },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    status: {
+        type: String,
+        enum: ['pending', 'generating', 'completed', 'failed'],
+        default: 'pending',
+    },
+    error: { type: String }, // To store any error messages
+}, { timestamps: true });
+
+const GeneratedReport = mongoose.model('GeneratedReport', GeneratedReportSchema);
+
+
 // Multer setup
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -99,4 +150,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-module.exports = { HospitalLevel, Incident, Asset, Task, MeterReading, Report, HospitalProfile, upload };
+module.exports = {
+    HospitalLevel,
+    Incident,
+    Asset,
+    Task,
+    MeterReading,
+    Report,
+    HospitalProfile,
+    GeneratedReport,
+    upload,
+};

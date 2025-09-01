@@ -1,18 +1,60 @@
 const mongoose = require('mongoose');
 
 const classSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true },
-  description: { type: String },
+  name: { 
+    type: String, 
+    required: true, 
+    trim: true 
+  },
+  description: { 
+    type: String,
+    maxlength: 8000
+  },
+  teacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  department: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  creditsRequired: {
+    type: Number,
+    min: [0, 'Credits must be a positive number'],
+    required: true,
+  },
+  image: {
+    type: String,
+    default: '',
+  },
   timetable: [{
     day: String,
     startTime: String,
     endTime: String,
-    teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    substituteTeacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    venue: String, // Added venue field
   }],
-  students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  HOD: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  venueAnnouncements: [{
+    venue: String,
+    message: String,
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    active: {
+      type: Boolean,
+      default: true
+    }
+  }],
+  enrolledStudents: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User' 
+  }],
+  HOD: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User' 
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Class', classSchema);

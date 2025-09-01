@@ -11,7 +11,9 @@ const notificationSchema = new mongoose.Schema({
     'teacher_absence',
     'student_absence',
     'substitute_assigned',
-    'timetable_update'
+    'timetable_update',
+    'staff_registration',
+    'role_assigned'
   ], required: true },
   title: String,
   message: String,

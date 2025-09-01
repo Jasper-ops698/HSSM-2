@@ -23,7 +23,7 @@ const googleAuth = async (req, res) => {
         email: payload.email,
         phone: '', // Google doesn't provide phone, you may want to prompt later
         password: '', // Not needed for Google users
-        role: 'individual', // Default or adjust as needed
+        role: 'student', // Default or adjust as needed
         avatar: payload.picture,
         googleId: payload.sub,
       });

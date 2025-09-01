@@ -34,17 +34,25 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: [
-        'individual',
-        'service-provider',
-        'admin',
-        'HSSM-provider',
         'student',
+        'staff',
         'teacher',
         'credit-controller',
-        'HOD'
+        'HOD',
+        'admin',
+        'HSSM-provider',
       ],
       required: true,
-      default: 'individual', // Default role is 'individual'
+      default: 'student',
+    },
+    department: {
+      type: String,
+      trim: true,
+      // Not required for all users, only for teachers and HODs
+    },
+    credits: {
+      type: Number,
+      default: 0,
     },
     deviceToken: { 
       type: String, 

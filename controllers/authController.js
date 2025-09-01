@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/generateToken');
 const { validationResult } = require('express-validator');
@@ -36,6 +37,20 @@ const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({ name, email, phone, password: hashedPassword, role });
+
+    if (role === 'staff') {
+      const admins = await User.find({ role: 'admin' });
+      const notifications = admins.map(admin => ({
+        recipient: admin._id,
+        type: 'staff_registration',
+        title: 'New Staff Registration',
+        message: `A new staff member, ${name}, has registered and requires role assignment.`,
+        data: { newUserId: user._id }
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
+    }
 
     const token = generateToken(user._id, email, name, phone, role);
 
