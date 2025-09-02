@@ -1,9 +1,20 @@
-const { assignUserRole } = require('../controllers/adminController');
-// Assign role to a staff (teacher, credit-controller, HOD)
-router.post('/assignRole', assignUserRole);
 const express = require('express');
 const router = express.Router();
-const { addServiceProvider, deleteServiceProvider, getAllData, getAllReportsByHSSMProviders, deleteUser, deleteHssmProviderReport, disableServiceProvider, deleteHssmProvider, disableHssmProvider } = require('../controllers/adminController');
+const { 
+    assignUserRole,
+    addServiceProvider, 
+    deleteServiceProvider, 
+    getAllData, 
+    getAllReportsByHSSMProviders, 
+    deleteUser, 
+    deleteHssmProviderReport, 
+    disableServiceProvider, 
+    deleteHssmProvider, 
+    disableHssmProvider 
+} = require('../controllers/adminController');
+
+// Assign role to a staff (teacher, credit-controller, HOD)
+router.post('/assignRole', assignUserRole);
 
 // Add a service provider
 router.post('/addProvider', addServiceProvider);
