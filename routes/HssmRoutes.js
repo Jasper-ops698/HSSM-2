@@ -51,4 +51,4 @@ router.delete('/meter-readings/:id', protect, verifyRole(['HSSM-provider']), del
 // --- Hospital Profile Routes ---
 router.post('/profile', protect, verifyRole(['HSSM-provider']), createHospitalProfile);
 router.get('/profile', protect, verifyRole(['HSSM-provider']), getHospitalProfile);
-router.put('/profile', protect, verifyRole(['HSSM-provider']),
+router.put('/profile', protect, verifyRole(['HSSM-provider']), updateHospitalProfile);
