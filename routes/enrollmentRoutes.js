@@ -5,7 +5,7 @@ const {
   respondToEnrollment,
   getAllEnrollments,
 } = require('../controllers/enrollmentController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware'); // Correctly import 'protect'
 const verifyRole = require('../middlewares/verifyRole');
 
 // --- Enrollment Routes ---
@@ -13,7 +13,7 @@ const verifyRole = require('../middlewares/verifyRole');
 // Student requests to enroll in a class
 router.post(
   '/request',
-  authMiddleware,
+  protect, // Use the 'protect' function
   verifyRole(['student']),
   requestEnrollment
 );
@@ -21,7 +21,7 @@ router.post(
 // Teacher or HOD responds to an enrollment request
 router.post(
   '/respond',
-  authMiddleware,
+  protect, // Use the 'protect' function
   verifyRole(['teacher', 'HOD']),
   respondToEnrollment
 );
@@ -29,7 +29,7 @@ router.post(
 // Admin or HOD gets all enrollment requests
 router.get(
   '/all',
-  authMiddleware,
+  protect, // Use the 'protect' function
   verifyRole(['admin', 'HOD']),
   getAllEnrollments
 );
