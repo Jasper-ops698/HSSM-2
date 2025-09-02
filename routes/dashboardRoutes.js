@@ -1,9 +1,9 @@
 const express = require('express');
-const { protect } = require('../middlewares/authMiddleware');
-const dashboardController = require('../controllers/dashboardControllers'); 
-
 const router = express.Router();
+const { getDashboardData } = require('../controllers/dashboardControllers');
+const { protect } = require('../middlewares/authMiddleware'); // Correctly import 'protect'
 
-router.get('/', protect, dashboardController.getDashboard); 
+// Get dashboard data for the logged-in user
+router.get('/', protect, getDashboardData); // Use the 'protect' function
 
 module.exports = router;

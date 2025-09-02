@@ -1,46 +1,59 @@
 const express = require('express');
 const router = express.Router();
-const { 
+const {
   createClass,
+  getAllClasses,
   updateClass,
   deleteClass,
-  getTeacherClasses,
-} = require('../controllers/teacherController');
-const authMiddleware = require('../middlewares/authMiddleware');
+  getClassesByTeacher,
+  getStudentsByClass,
+} = require('../controllers/classController');
+const { protect } = require('../middlewares/authMiddleware'); // Correctly import 'protect'
 const verifyRole = require('../middlewares/verifyRole');
 
-// --- Class Management Routes (for Teachers) ---
+// --- Class Routes ---
 
-// Teacher creates a new class
+// Create a new class (only admin or HOD)
 router.post(
   '/',
-  authMiddleware,
-  verifyRole(['teacher']),
+  protect, // Use the 'protect' function
+  verifyRole(['admin', 'HOD']),
   createClass
 );
 
-// Teacher updates their own class
+// Get all classes (accessible to all authenticated users)
+router.get('/', protect, getAllClasses); // Use the 'protect' function
+
+// Update a class (only admin or HOD)
 router.put(
   '/:id',
-  authMiddleware,
-  verifyRole(['teacher']),
+  protect, // Use the 'protect' function
+  verifyRole(['admin', 'HOD']),
   updateClass
 );
 
-// Teacher deletes their own class
+// Delete a class (only admin or HOD)
 router.delete(
   '/:id',
-  authMiddleware,
-  verifyRole(['teacher']),
+  protect, // Use the 'protect' function
+  verifyRole(['admin', 'HOD']),
   deleteClass
 );
 
-// Teacher gets all of their classes
+// Get classes assigned to a specific teacher
 router.get(
-  '/',
-  authMiddleware,
-  verifyRole(['teacher']),
-  getTeacherClasses
+  '/teacher/:teacherId',
+  protect, // Use the 'protect' function
+  verifyRole(['teacher', 'admin', 'HOD']),
+  getClassesByTeacher
+);
+
+// Get all students enrolled in a specific class
+router.get(
+  '/:classId/students',
+  protect, // Use the 'protect' function
+  verifyRole(['teacher', 'admin', 'HOD']),
+  getStudentsByClass
 );
 
 module.exports = router;
