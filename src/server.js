@@ -22,6 +22,19 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
+// --- Global Middleware ---
+app.use(helmet());
+app.use(cors());
+app.use(morgan('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use(limiter);
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // --- Database Connection and Route Setup ---
 connectToDatabase()
