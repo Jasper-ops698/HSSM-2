@@ -41,7 +41,7 @@ const getDashboardData = async (req, res) => {
         data.stats = { studentCount, teacherCount, classCount, enrollmentCount };
     }
 
-    res.status(200).json({ success: true, data });
+    res.status(200).json({ success: true, kpi: data });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
