@@ -8,27 +8,27 @@ const {
     deleteReport,
     downloadReport,
 } = require('../controllers/reportController');
-const authMiddleware = require('../middlewares/authMiddleware');
-const { verifyRole } = require('../middlewares/verifyRole');
+const { protect } = require('../middlewares/authMiddleware');
+const verifyRole = require('../middlewares/verifyRole');
 
 const hssmProviderOnly = verifyRole(['HSSM-provider']);
 
 // Generate a new report
-router.post('/generate', authMiddleware, hssmProviderOnly, generateReport);
+router.post('/generate', protect, hssmProviderOnly, generateReport);
 
 // Get all reports for the user
-router.get('/', authMiddleware, hssmProviderOnly, getReports);
+router.get('/', protect, hssmProviderOnly, getReports);
 
 // Get a single report
-router.get('/:id', authMiddleware, hssmProviderOnly, getReportById);
+router.get('/:id', protect, hssmProviderOnly, getReportById);
 
 // Update a report
-router.put('/:id', authMiddleware, hssmProviderOnly, updateReport);
+router.put('/:id', protect, hssmProviderOnly, updateReport);
 
 // Delete a report
-router.delete('/:id', authMiddleware, hssmProviderOnly, deleteReport);
+router.delete('/:id', protect, hssmProviderOnly, deleteReport);
 
 // Download a report as PowerPoint
-router.get('/:id/download', authMiddleware, hssmProviderOnly, downloadReport);
+router.get('/:id/download', protect, hssmProviderOnly, downloadReport);
 
 module.exports = router;

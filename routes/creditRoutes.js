@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDashboardData, addCredits, deductCredits } = require('../controllers/creditController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
 
 // --- Credit Controller Routes ---
@@ -9,7 +9,7 @@ const verifyRole = require('../middlewares/verifyRole');
 // Get dashboard data (list of students and their credits)
 router.get(
   '/dashboard',
-  authMiddleware,
+  protect,
   verifyRole(['credit-controller', 'admin']), // Protect this route
   getDashboardData
 );
@@ -17,7 +17,7 @@ router.get(
 // Add credits to a user's account
 router.post(
   '/add',
-  authMiddleware,
+  protect,
   verifyRole(['credit-controller', 'admin']), // Protect this route
   addCredits
 );
@@ -25,7 +25,7 @@ router.post(
 // Deduct credits from a user's account
 router.post(
   '/deduct',
-  authMiddleware,
+  protect,
   verifyRole(['credit-controller', 'admin']), // Protect this route
   deductCredits
 );

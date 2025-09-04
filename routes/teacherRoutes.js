@@ -11,55 +11,55 @@ const {
   updateVenueAnnouncement,
   getVenueAnnouncements
 } = require('../controllers/teacherController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
 
 // Dashboard and attendance routes
 // @route   GET /api/teacher/dashboard
 // @desc    Get data for the teacher dashboard
 // @access  Private (Teacher)
-router.get('/dashboard', authMiddleware, verifyRole(['teacher']), getDashboardData);
+router.get('/dashboard', protect, verifyRole(['teacher']), getDashboardData);
 
 // @route   POST /api/teacher/attendance
 // @desc    Mark student attendance
 // @access  Private (Teacher)
-router.post('/attendance', authMiddleware, verifyRole(['teacher']), markAttendance);
+router.post('/attendance', protect, verifyRole(['teacher']), markAttendance);
 
 // Class management routes
 // @route   POST /api/teacher/class
 // @desc    Create a new class
 // @access  Private (Teacher)
-router.post('/class', authMiddleware, verifyRole(['teacher']), createClass);
+router.post('/class', protect, verifyRole(['teacher']), createClass);
 
 // @route   PUT /api/teacher/class/:id
 // @desc    Update a class
 // @access  Private (Teacher)
-router.put('/class/:id', authMiddleware, verifyRole(['teacher']), updateClass);
+router.put('/class/:id', protect, verifyRole(['teacher']), updateClass);
 
 // @route   DELETE /api/teacher/class/:id
 // @desc    Delete a class
 // @access  Private (Teacher)
-router.delete('/class/:id', authMiddleware, verifyRole(['teacher']), deleteClass);
+router.delete('/class/:id', protect, verifyRole(['teacher']), deleteClass);
 
 // @route   GET /api/teacher/classes
 // @desc    Get all classes for the logged-in teacher
 // @access  Private (Teacher)
-router.get('/classes', authMiddleware, verifyRole(['teacher']), getTeacherClasses);
+router.get('/classes', protect, verifyRole(['teacher']), getTeacherClasses);
 
 // Venue announcement routes
 // @route   POST /api/teacher/class/:id/venue-announcement
 // @desc    Add a venue announcement for a class
 // @access  Private (Teacher)
-router.post('/class/:id/venue-announcement', authMiddleware, verifyRole(['teacher']), addVenueAnnouncement);
+router.post('/class/:id/venue-announcement', protect, verifyRole(['teacher']), addVenueAnnouncement);
 
 // @route   PUT /api/teacher/class/:id/venue-announcement/:announcementId
 // @desc    Update a venue announcement
 // @access  Private (Teacher)
-router.put('/class/:id/venue-announcement/:announcementId', authMiddleware, verifyRole(['teacher']), updateVenueAnnouncement);
+router.put('/class/:id/venue-announcement/:announcementId', protect, verifyRole(['teacher']), updateVenueAnnouncement);
 
 // @route   GET /api/teacher/class/:id/venue-announcements
 // @desc    Get venue announcements for a class
 // @access  Private (Teacher)
-router.get('/class/:id/venue-announcements', authMiddleware, verifyRole(['teacher']), getVenueAnnouncements);
+router.get('/class/:id/venue-announcements', protect, verifyRole(['teacher']), getVenueAnnouncements);
 
 module.exports = router;

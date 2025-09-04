@@ -7,7 +7,7 @@ const {
   updateAnnouncement, 
   deleteAnnouncement 
 } = require('../controllers/announcementController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
 
 // @route   POST /api/announcements
@@ -15,7 +15,7 @@ const verifyRole = require('../middlewares/verifyRole');
 // @access  Private (Admin, HOD, Teacher)
 router.post(
   '/', 
-  authMiddleware, 
+  protect, 
   verifyRole(['admin', 'HOD', 'teacher']), 
   createAnnouncement
 );
@@ -23,19 +23,19 @@ router.post(
 // @route   GET /api/announcements
 // @desc    Get all announcements (with filtering)
 // @access  Private
-router.get('/', authMiddleware, getAnnouncements);
+router.get('/', protect, getAnnouncements);
 
 // @route   GET /api/announcements/:id
 // @desc    Get a single announcement by ID
 // @access  Private
-router.get('/:id', authMiddleware, getAnnouncementById);
+router.get('/:id', protect, getAnnouncementById);
 
 // @route   PUT /api/announcements/:id
 // @desc    Update an announcement
 // @access  Private (Admin, HOD, Teacher - original creator)
 router.put(
   '/:id', 
-  authMiddleware, 
+  protect, 
   verifyRole(['admin', 'HOD', 'teacher']), 
   updateAnnouncement
 );
@@ -45,7 +45,7 @@ router.put(
 // @access  Private (Admin, HOD, Teacher - original creator)
 router.delete(
   '/:id', 
-  authMiddleware, 
+  protect, 
   verifyRole(['admin', 'HOD', 'teacher']), 
   deleteAnnouncement
 );
