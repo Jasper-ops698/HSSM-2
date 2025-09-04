@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema({
   ], required: true },
   title: String,
   message: String,
-  data: Object,
+  data: mongoose.Schema.Types.Mixed,
   read: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });

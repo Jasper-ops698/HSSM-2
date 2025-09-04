@@ -52,3 +52,5 @@ router.delete('/meter-readings/:id', protect, verifyRole(['HSSM-provider']), del
 router.post('/profile', protect, verifyRole(['HSSM-provider']), createHospitalProfile);
 router.get('/profile', protect, verifyRole(['HSSM-provider']), getHospitalProfile);
 router.put('/profile', protect, verifyRole(['HSSM-provider']), updateHospitalProfile);
+
+module.exports = router;
