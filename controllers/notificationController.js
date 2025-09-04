@@ -25,3 +25,8 @@ exports.markNotificationsAsRead = async (req, res) => {
     res.status(500).json({ msg: 'Server error' });
   }
 };
+
+module.exports = {
+  getNotifications: exports.getNotifications,
+  markNotificationsAsRead: exports.markNotificationsAsRead,
+};
