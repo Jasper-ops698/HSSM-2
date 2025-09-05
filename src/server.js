@@ -25,7 +25,7 @@ const app = express();
 // --- Global Middleware ---
 app.use(helmet());
 app.use(cors({
-  origin: 'https://hssm-services.web.app',
+  origin: process.env.ALLOWED_ORIGINS,
   credentials: true,
 }));
 app.use(morgan('dev'));
