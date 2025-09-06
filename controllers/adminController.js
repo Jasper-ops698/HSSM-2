@@ -33,7 +33,14 @@ const assignUserRole = async (req, res) => {
 
 const addServiceProvider = (req, res) => res.status(501).json({ message: 'Not Implemented' });
 const deleteServiceProvider = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const getAllData = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const getAllData = async (req, res) => {
+  try {
+    const users = await User.find({}, 'name email role department'); // Fetch users with selected fields
+    res.status(200).json({ users });
+  } catch (error) {
+    res.status(500).json({ msg: 'Error fetching data', error: error.message });
+  }
+};
 const getAllReportsByHSSMProviders = (req, res) => res.status(501).json({ message: 'Not Implemented' });
 const deleteUser = (req, res) => res.status(501).json({ message: 'Not Implemented' });
 const deleteHssmProviderReport = (req, res) => res.status(501).json({ message: 'Not Implemented' });

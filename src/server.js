@@ -25,7 +25,7 @@ const app = express();
 // --- Global Middleware ---
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS,
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000'],
   credentials: true,
 }));
 app.use(morgan('dev'));
