@@ -1,4 +1,4 @@
-const { HospitalLevel, Incident, Asset, Task, MeterReading, Report, HospitalProfile } = require('../models/Hssm');
+const { HospitalLevel, Incident, Asset, Task, MeterReading, Report, HospitalProfile, GeneratedReport } = require('../models/Hssm');
 const sanitizeHtml = require('sanitize-html');
 
 // Helper function to sanitize input
@@ -117,19 +117,176 @@ const getAllMeterReadings = async (req, res, next) => {
 
 // --- ADDED PLACEHOLDER FUNCTIONS ---
 
-const updateIncident = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const deleteIncident = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const updateIncident = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Sanitize string inputs
+    if (updateData.department) updateData.department = sanitizeInput(updateData.department);
+    if (updateData.title) updateData.title = sanitizeInput(updateData.title);
+    if (updateData.priority) updateData.priority = sanitizeInput(updateData.priority);
+    if (updateData.description) updateData.description = sanitizeInput(updateData.description);
+    
+    // Handle file upload
+    if (req.file) {
+      updateData.file = req.file.filename;
+    }
+    
+    const updatedIncident = await Incident.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedIncident) {
+      return res.status(404).json({ message: 'Incident not found' });
+    }
+    res.status(200).json(updatedIncident);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
-const updateAsset = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const deleteAsset = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const deleteIncident = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedIncident = await Incident.findByIdAndDelete(id);
+    if (!deletedIncident) {
+      return res.status(404).json({ message: 'Incident not found' });
+    }
+    res.status(200).json({ message: 'Incident deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
-const updateTask = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const deleteTask = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const updateAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Handle file upload
+    if (req.file) {
+      updateData.file = req.file.filename;
+    }
+    
+    const updatedAsset = await Asset.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedAsset) {
+      return res.status(404).json({ message: 'Asset not found' });
+    }
+    res.status(200).json(updatedAsset);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
-const updateMeterReading = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const deleteMeterReading = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const deleteAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedAsset = await Asset.findByIdAndDelete(id);
+    if (!deletedAsset) {
+      return res.status(404).json({ message: 'Asset not found' });
+    }
+    res.status(200).json({ message: 'Asset deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
-const createHospitalProfile = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Sanitize string inputs
+    if (updateData.title) updateData.title = sanitizeInput(updateData.title);
+    if (updateData.description) updateData.description = sanitizeInput(updateData.description);
+    if (updateData.assignedTo) updateData.assignedTo = sanitizeInput(updateData.assignedTo);
+    if (updateData.priority) updateData.priority = sanitizeInput(updateData.priority);
+    
+    const updatedTask = await Task.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+    res.status(200).json(updatedTask);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedTask = await Task.findByIdAndDelete(id);
+    if (!deletedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+    res.status(200).json({ message: 'Task deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateMeterReading = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    const updatedReading = await MeterReading.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedReading) {
+      return res.status(404).json({ message: 'Meter reading not found' });
+    }
+    res.status(200).json(updatedReading);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteMeterReading = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedReading = await MeterReading.findByIdAndDelete(id);
+    if (!deletedReading) {
+      return res.status(404).json({ message: 'Meter reading not found' });
+    }
+    res.status(200).json({ message: 'Meter reading deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const createHospitalProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const profileData = { ...req.body, userId };
+    
+    // Sanitize string inputs
+    if (profileData.hospitalName) profileData.hospitalName = sanitizeInput(profileData.hospitalName);
+    if (profileData.mission) profileData.mission = sanitizeInput(profileData.mission);
+    if (profileData.vision) profileData.vision = sanitizeInput(profileData.vision);
+    if (profileData.serviceCharter) profileData.serviceCharter = sanitizeInput(profileData.serviceCharter);
+    
+    // Handle location subfields sanitization
+    if (profileData.location) {
+      if (profileData.location.address) profileData.location.address = sanitizeInput(profileData.location.address);
+      if (profileData.location.city) profileData.location.city = sanitizeInput(profileData.location.city);
+      if (profileData.location.state) profileData.location.state = sanitizeInput(profileData.location.state);
+      if (profileData.location.country) profileData.location.country = sanitizeInput(profileData.location.country);
+      if (profileData.location.postalCode) profileData.location.postalCode = sanitizeInput(profileData.location.postalCode);
+    }
+    
+    // Handle file upload for organogram
+    if (req.file) {
+      profileData.organogram = req.file.filename;
+    }
+    
+    const newProfile = new HospitalProfile(profileData);
+    await newProfile.save();
+    res.status(201).json(newProfile);
+  } catch (err) {
+    if (err.code === 11000) {
+      res.status(400).json({ message: 'Hospital profile already exists for this user' });
+    } else {
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+};
 const getHospitalProfile = async (req, res) => {
   try {
     const profile = await HospitalProfile.findOne({ userId: req.user.id });
@@ -187,6 +344,16 @@ const updateHospitalProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error while updating profile' });
   }
 };
+
+const getAllReports = async (req, res) => {
+  try {
+    const reports = await GeneratedReport.find({ user: req.user.id }).sort({ createdAt: -1 });
+    res.status(200).json(reports);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error while fetching reports' });
+  }
+};
+
 const getMeterReadingTrend = async (req, res, next) => {
   try {
     const { userId, limit = 30 } = req.query;
