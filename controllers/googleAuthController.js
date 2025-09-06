@@ -26,6 +26,7 @@ const googleAuth = async (req, res) => {
         role: 'student', // Default or adjust as needed
         avatar: payload.picture,
         googleId: payload.sub,
+        emailVerified: true, // Google accounts are pre-verified
       });
     }
     // Issue your own JWT

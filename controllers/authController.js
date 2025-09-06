@@ -36,7 +36,19 @@ const registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({ name, email, phone, password: hashedPassword, role });
+    // Generate verification token
+    const verificationToken = require('crypto').randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    const user = await User.create({ 
+      name, 
+      email, 
+      phone, 
+      password: hashedPassword, 
+      role,
+      verificationToken,
+      verificationTokenExpires
+    });
 
     if (role === 'staff') {
       const admins = await User.find({ role: 'admin' });
@@ -52,21 +64,76 @@ const registerUser = async (req, res) => {
       }
     }
 
-    const token = generateToken(user._id, email, name, phone, role);
+    // Send verification email
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Verify Your Email - MultiShop',
+      html: `
+        <h2>Welcome to MultiShop!</h2>
+        <p>Please verify your email address by clicking the link below:</p>
+        <a href="${verificationUrl}" style="background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
+        <p>This link will expire in 24 hours.</p>
+        <p>If you didn't create an account, please ignore this email.</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
 
     return res.status(201).json({
-      token,
+      message: 'Registration successful! Please check your email to verify your account.',
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        emailVerified: user.emailVerified,
       },
     });
   } catch (err) {
 
     return res.status(500).json({ message: 'Error registering user' });
+  }
+};
+
+// Define the verifyEmail function
+const verifyEmail = async (req, res) => {
+  const { token } = req.query;
+
+  try {
+    const user = await User.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification token' });
+    }
+
+    user.emailVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+    await user.save();
+
+    // Generate auth token for auto-login after verification
+    const authToken = generateToken(user._id, user.email, user.name, user.phone, user.role);
+
+    return res.status(200).json({
+      message: 'Email verified successfully!',
+      token: authToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        emailVerified: user.emailVerified,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error verifying email' });
   }
 };
 
@@ -91,6 +158,11 @@ const loginUser = async (req, res) => {
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      return res.status(403).json({ message: 'Please verify your email before logging in.' });
     }
 
     // 2FA logic
@@ -254,6 +326,7 @@ const getProfile = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  verifyEmail,
   forgotPassword,
   DeviceToken,
   updateProfile,
