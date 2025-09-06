@@ -130,8 +130,26 @@ const updateMeterReading = (req, res) => res.status(501).json({ message: 'Not Im
 const deleteMeterReading = (req, res) => res.status(501).json({ message: 'Not Implemented' });
 
 const createHospitalProfile = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const getHospitalProfile = (req, res) => res.status(501).json({ message: 'Not Implemented' });
-const updateHospitalProfile = (req, res) => res.status(501).json({ message: 'Not Implemented' });
+const getHospitalProfile = async (req, res) => {
+  try {
+    const profile = await HospitalProfile.findOne({ userId: req.user.id });
+    if (!profile) {
+      return res.status(404).json({ message: 'Hospital profile not found' });
+    }
+    res.status(200).json(profile);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+const getMeterReadingTrend = async (req, res, next) => {
+  try {
+    const { userId, limit = 30 } = req.query;
+    const trend = await MeterReading.find({ userId }).sort({ date: -1 }).limit(parseInt(limit));
+    res.status(200).json(trend);
+  } catch (err) {
+    next(err);
+  }
+};
 
 module.exports = {
     createIncident,
@@ -153,4 +171,6 @@ module.exports = {
     createHospitalProfile,
     getHospitalProfile,
     updateHospitalProfile,
+    getAllReports,
+    getMeterReadingTrend,
 };

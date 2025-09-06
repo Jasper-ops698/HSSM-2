@@ -20,6 +20,8 @@ const {
   createHospitalProfile,
   getHospitalProfile,
   updateHospitalProfile,
+  getAllReports,
+  getMeterReadingTrend,
 } = require('../controllers/HssmController');
 const { protect } = require('../middlewares/authMiddleware'); // Correctly import 'protect'
 const verifyRole = require('../middlewares/verifyRole');
@@ -47,10 +49,14 @@ router.post('/meter-readings', protect, verifyRole(['HSSM-provider']), createMet
 router.get('/meter-readings', protect, verifyRole(['HSSM-provider']), getAllMeterReadings);
 router.put('/meter-readings/:id', protect, verifyRole(['HSSM-provider']), updateMeterReading);
 router.delete('/meter-readings/:id', protect, verifyRole(['HSSM-provider']), deleteMeterReading);
+router.get('/meter-readings/trend', protect, verifyRole(['HSSM-provider']), getMeterReadingTrend);
 
 // --- Hospital Profile Routes ---
 router.post('/profile', protect, verifyRole(['HSSM-provider']), createHospitalProfile);
 router.get('/profile', protect, verifyRole(['HSSM-provider']), getHospitalProfile);
 router.put('/profile', protect, verifyRole(['HSSM-provider']), updateHospitalProfile);
+
+// --- Report Routes ---
+router.get('/reports', protect, verifyRole(['HSSM-provider']), getAllReports);
 
 module.exports = router;
