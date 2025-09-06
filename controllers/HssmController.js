@@ -141,6 +141,52 @@ const getHospitalProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+const updateHospitalProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const updateData = req.body;
+
+    // Sanitize string inputs
+    if (updateData.hospitalName) updateData.hospitalName = sanitizeInput(updateData.hospitalName);
+    if (updateData.mission) updateData.mission = sanitizeInput(updateData.mission);
+    if (updateData.vision) updateData.vision = sanitizeInput(updateData.vision);
+    if (updateData.serviceCharter) updateData.serviceCharter = sanitizeInput(updateData.serviceCharter);
+
+    // Handle location subfields sanitization
+    if (updateData.location) {
+      if (updateData.location.address) updateData.location.address = sanitizeInput(updateData.location.address);
+      if (updateData.location.city) updateData.location.city = sanitizeInput(updateData.location.city);
+      if (updateData.location.state) updateData.location.state = sanitizeInput(updateData.location.state);
+      if (updateData.location.country) updateData.location.country = sanitizeInput(updateData.location.country);
+      if (updateData.location.postalCode) updateData.location.postalCode = sanitizeInput(updateData.location.postalCode);
+    }
+
+    // Handle file upload for organogram
+    if (req.file) {
+      updateData.organogram = req.file.filename;
+    }
+
+    // Find and update the profile
+    const updatedProfile = await HospitalProfile.findOneAndUpdate(
+      { userId },
+      { $set: updateData },
+      { 
+        new: true, // Return the updated document
+        upsert: true, // Create if doesn't exist
+        runValidators: true // Run schema validators
+      }
+    );
+
+    res.status(200).json({
+      message: 'Hospital profile updated successfully',
+      profile: updatedProfile
+    });
+  } catch (err) {
+    console.error('Error updating hospital profile:', err);
+    res.status(500).json({ message: 'Server error while updating profile' });
+  }
+};
 const getMeterReadingTrend = async (req, res, next) => {
   try {
     const { userId, limit = 30 } = req.query;

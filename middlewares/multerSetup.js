@@ -22,6 +22,17 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Set up file filter for document files (PDF, DOC, DOCX, etc.)
+const documentFileFilter = (req, file, cb) => {
+  const allowedFileTypes = /pdf|doc|docx|txt|rtf/;
+  const isValidFile = allowedFileTypes.test(file.mimetype) || allowedFileTypes.test(file.originalname.split('.').pop());
+  if (isValidFile) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only document files (PDF, DOC, DOCX, TXT, RTF) are allowed!'), false);
+  }
+};
+
 // Set up upload middleware with file size limit and filter
 const upload = multer({
   storage,
@@ -29,4 +40,12 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // Max file size 5MB
 });
 
+// Set up document upload middleware
+const uploadDocument = multer({
+  storage,
+  fileFilter: documentFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // Max file size 10MB for documents
+});
+
 module.exports = upload;
+module.exports.uploadDocument = uploadDocument;
