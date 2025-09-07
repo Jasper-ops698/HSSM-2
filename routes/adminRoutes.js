@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { 
     assignUserRole,
-    addServiceProvider, 
-    deleteServiceProvider, 
+    addStaff, 
+    deleteStaff, 
     getAllData, 
     getAllReportsByHSSMProviders, 
     deleteUser, 
     deleteHssmProviderReport, 
-    disableServiceProvider, 
+    disableStaff, 
     deleteHssmProvider, 
     disableHssmProvider 
 } = require('../controllers/adminController');
@@ -16,14 +16,14 @@ const {
 // Assign role to a staff (teacher, credit-controller, HOD)
 router.post('/assignRole', assignUserRole);
 
-// Add a service provider
-router.post('/addProvider', addServiceProvider);
+// Add a staff member
+router.post('/addStaff', addStaff);
 
-// Delete a service provider
-router.delete('/serviceProvider/:id', deleteServiceProvider);
+// Delete a staff member
+router.delete('/staff/:id', deleteStaff);
 
-// Disable a service provider
-router.put('/serviceProvider/:id/disable', disableServiceProvider);
+// Disable a staff member
+router.put('/staff/:id/disable', disableStaff);
 
 // Delete an HSSM provider
 router.delete('/hssmProvider/:id', deleteHssmProvider);

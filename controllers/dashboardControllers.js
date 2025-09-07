@@ -1,6 +1,8 @@
 const Enrollment = require('../models/Enrollment');
 const Class = require('../models/Class');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const Announcement = require('../models/Announcement');
 
 // @desc    Get dashboard data for the logged-in user
 // @route   GET /api/dashboard
@@ -17,33 +19,144 @@ const getDashboardData = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        department: user.department,
       },
     };
 
+    // Get common data for all users
+    const [notifications, announcements] = await Promise.all([
+      Notification.find({ userId: user._id }).sort({ createdAt: -1 }).limit(5),
+      getRelevantAnnouncements(user)
+    ]);
+
+    data.notifications = notifications;
+    data.announcements = announcements;
+
     // Customize data based on user role
-    if (user.role === 'student') {
-      const enrollments = await Enrollment.find({ student: user._id }).populate({
-        path: 'class',
-        populate: {
-          path: 'teacher',
-          select: 'name',
-        },
-      });
-      data.enrollments = enrollments;
-    } else if (user.role === 'teacher') {
-      const classes = await Class.find({ teacher: user._id }).populate('teacher', 'name');
-      data.classes = classes;
-    } else if (user.role === 'admin' || user.role === 'HOD') {
-        const studentCount = await User.countDocuments({ role: 'student' });
-        const teacherCount = await User.countDocuments({ role: 'teacher' });
-        const classCount = await Class.countDocuments();
-        const enrollmentCount = await Enrollment.countDocuments();
-        data.stats = { studentCount, teacherCount, classCount, enrollmentCount };
+    switch (user.role) {
+      case 'student':
+        const enrollments = await Enrollment.find({ student: user._id }).populate({
+          path: 'class',
+          populate: {
+            path: 'teacher',
+            select: 'name',
+          },
+        });
+        data.enrollments = enrollments;
+        data.kpi = {
+          enrolledClasses: enrollments.length,
+          credits: user.credits || 0
+        };
+        break;
+
+      case 'teacher':
+        const classes = await Class.find({ teacher: user._id }).populate('teacher', 'name');
+        data.classes = classes;
+        data.kpi = {
+          totalClasses: classes.length,
+          enrolledStudents: classes.reduce((total, cls) => total + (cls.enrolledStudents?.length || 0), 0)
+        };
+        break;
+
+      case 'HOD':
+        const [hodTeachers, hodClasses, hodEnrollments] = await Promise.all([
+          User.find({ role: 'teacher', department: user.department }).select('name email'),
+          Class.find({ department: user.department }).populate('teacher', 'name'),
+          Enrollment.find({
+            class: { $in: hodClasses.map(c => c._id) }
+          }).populate('student', 'name email').populate('class', 'name')
+        ]);
+
+        const uniqueStudents = new Set();
+        hodEnrollments.forEach(enrollment => {
+          if (enrollment.status === 'Approved') {
+            uniqueStudents.add(enrollment.student._id.toString());
+          }
+        });
+
+        data.teachers = hodTeachers;
+        data.classes = hodClasses;
+        data.enrollments = hodEnrollments;
+        data.kpi = {
+          totalTeachers: hodTeachers.length,
+          totalClasses: hodClasses.length,
+          totalStudents: uniqueStudents.size,
+          pendingEnrollments: hodEnrollments.filter(e => e.status === 'Pending').length
+        };
+        break;
+
+      case 'credit-controller':
+        const allStudents = await User.find({ role: 'student' }).select('name email credits');
+        const lowCreditStudents = allStudents.filter(student => (student.credits || 0) < 10);
+
+        data.students = allStudents;
+        data.kpi = {
+          totalStudents: allStudents.length,
+          lowCreditStudents: lowCreditStudents.length,
+          totalCreditsIssued: allStudents.reduce((total, student) => total + (student.credits || 0), 0)
+        };
+        break;
+
+      case 'admin':
+        const [studentCount, teacherCount, classCount, enrollmentCount] = await Promise.all([
+          User.countDocuments({ role: 'student' }),
+          User.countDocuments({ role: 'teacher' }),
+          Class.countDocuments(),
+          Enrollment.countDocuments()
+        ]);
+
+        data.kpi = {
+          studentCount,
+          teacherCount,
+          classCount,
+          enrollmentCount,
+          totalUsers: await User.countDocuments()
+        };
+        break;
+
+      case 'HSSM-provider':
+        // Basic HSSM provider data - can be expanded
+        data.kpi = {
+          facilitiesManaged: 0, // Placeholder
+          reportsGenerated: 0  // Placeholder
+        };
+        break;
+
+      default:
+        data.kpi = {};
     }
 
     res.status(200).json({ success: true, kpi: data });
   } catch (error) {
+    console.error('Dashboard error:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+};
+
+// Helper function to get relevant announcements for a user
+const getRelevantAnnouncements = async (user) => {
+  try {
+    const currentDate = new Date();
+    const announcements = await Announcement.find({
+      active: true,
+      startDate: { $lte: currentDate },
+      $or: [
+        { endDate: null },
+        { endDate: { $gte: currentDate } }
+      ],
+      $or: [
+        { targetRoles: 'all' },
+        { targetRoles: user.role },
+        { department: user.department }
+      ]
+    })
+    .sort({ priority: -1, createdAt: -1 })
+    .limit(5);
+
+    return announcements;
+  } catch (error) {
+    console.error('Error fetching announcements:', error);
+    return [];
   }
 };
 

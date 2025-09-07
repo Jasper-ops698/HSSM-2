@@ -155,27 +155,6 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-// Define the migrateExistingUsers function (one-time use)
-const migrateExistingUsers = async (req, res) => {
-  try {
-    // Update all users who don't have verification tokens to be verified
-    const result = await User.updateMany(
-      { verificationToken: { $exists: false } },
-      { $set: { emailVerified: true } }
-    );
-
-    console.log(`Migrated ${result.modifiedCount} existing users to verified status`);
-    
-    return res.status(200).json({
-      message: `Successfully migrated ${result.modifiedCount} existing users`,
-      modifiedCount: result.modifiedCount
-    });
-  } catch (err) {
-    console.error('Error migrating existing users:', err);
-    return res.status(500).json({ message: 'Error migrating existing users' });
-  }
-};
-
 // Define the loginUser function
 const loginUser = async (req, res) => {
   const errors = validationResult(req);
@@ -367,7 +346,6 @@ module.exports = {
   registerUser,
   loginUser,
   verifyEmail,
-  migrateExistingUsers,
   forgotPassword,
   DeviceToken,
   updateProfile,
