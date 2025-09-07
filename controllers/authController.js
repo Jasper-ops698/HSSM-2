@@ -19,6 +19,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify email configuration on startup
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('Email transporter configuration error:', error);
+  } else {
+    console.log('Email transporter is ready to send messages');
+  }
+});
+
 // Define the registerUser function
 const registerUser = async (req, res) => {
   const errors = validationResult(req);
@@ -65,21 +74,30 @@ const registerUser = async (req, res) => {
     }
 
     // Send verification email
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Verify Your Email - MultiShop',
-      html: `
-        <h2>Welcome to MultiShop!</h2>
-        <p>Please verify your email address by clicking the link below:</p>
-        <a href="${verificationUrl}" style="background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-        <p>This link will expire in 24 hours.</p>
-        <p>If you didn't create an account, please ignore this email.</p>
-      `,
-    };
+    try {
+      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'Verify Your Email - MultiShop',
+        html: `
+          <h2>Welcome to MultiShop!</h2>
+          <p>Please verify your email address by clicking the link below:</p>
+          <a href="${verificationUrl}" style="background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
+          <p>This link will expire in 24 hours.</p>
+          <p>If you didn't create an account, please ignore this email.</p>
+        `,
+      };
 
-    await transporter.sendMail(mailOptions);
+      console.log('Sending verification email to:', email);
+      const emailResult = await transporter.sendMail(mailOptions);
+      console.log('Verification email sent successfully:', emailResult.messageId);
+
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Don't fail registration if email fails, but log it
+      // You might want to implement a retry mechanism or queue system here
+    }
 
     return res.status(201).json({
       message: 'Registration successful! Please check your email to verify your account.',
@@ -137,6 +155,27 @@ const verifyEmail = async (req, res) => {
   }
 };
 
+// Define the migrateExistingUsers function (one-time use)
+const migrateExistingUsers = async (req, res) => {
+  try {
+    // Update all users who don't have verification tokens to be verified
+    const result = await User.updateMany(
+      { verificationToken: { $exists: false } },
+      { $set: { emailVerified: true } }
+    );
+
+    console.log(`Migrated ${result.modifiedCount} existing users to verified status`);
+    
+    return res.status(200).json({
+      message: `Successfully migrated ${result.modifiedCount} existing users`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (err) {
+    console.error('Error migrating existing users:', err);
+    return res.status(500).json({ message: 'Error migrating existing users' });
+  }
+};
+
 // Define the loginUser function
 const loginUser = async (req, res) => {
   const errors = validationResult(req);
@@ -160,8 +199,9 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check if email is verified
-    if (!user.emailVerified) {
+    // Check if email is verified (only for new users who have verification tokens)
+    // Existing users without verification tokens are automatically considered verified
+    if (user.verificationToken && !user.emailVerified) {
       return res.status(403).json({ message: 'Please verify your email before logging in.' });
     }
 
@@ -327,6 +367,7 @@ module.exports = {
   registerUser,
   loginUser,
   verifyEmail,
+  migrateExistingUsers,
   forgotPassword,
   DeviceToken,
   updateProfile,
