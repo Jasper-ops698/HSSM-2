@@ -157,9 +157,9 @@ const getAllReportsByHSSMProviders = async (req, res) => {
 };
 const deleteUser = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { id } = req.params;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -169,7 +169,7 @@ const deleteUser = async (req, res) => {
       return res.status(403).json({ message: 'Cannot delete admin user' });
     }
 
-    await User.findByIdAndDelete(userId);
+    await User.findByIdAndDelete(id);
 
     res.status(200).json({
       success: true,
@@ -179,7 +179,7 @@ const deleteUser = async (req, res) => {
     console.error('Error deleting user:', error);
     res.status(500).json({ message: 'Error deleting user', error: error.message });
   }
-};
+};;
 const deleteHssmProviderReport = async (req, res) => {
   try {
     const { reportId, reportType } = req.params;
