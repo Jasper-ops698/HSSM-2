@@ -25,61 +25,55 @@ const app = express();
 // --- Global Middleware ---
 app.use(helmet());
 
-// CORS Configuration - More robust for production
+// CORS Configuration - Environment-driven solution
+if (!process.env.ALLOWED_ORIGINS) {
+  throw new Error('ALLOWED_ORIGINS environment variable is required. Set it to a comma-separated list of allowed origins.');
+}
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'https://hssm-services.web.app'];
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(origin => origin.length > 0);
 
-console.log('Allowed Origins:', allowedOrigins); // Debug log
+if (process.env.NODE_ENV !== 'production') {
+  console.log('CORS Allowed Origins:', allowedOrigins);
+}
 
-// Temporary CORS fix for development - allows localhost in development
-const corsOptions = process.env.NODE_ENV === 'production' ? {
+// Robust CORS configuration
+const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+
+    // Check against allowed origins
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('Blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-} : {
-  // Development CORS - more permissive
-  origin: true, // Allow all origins in development
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'X-CSRF-Token'
+  ],
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 
 // Handle preflight requests
-const preflightCorsOptions = process.env.NODE_ENV === 'production' ? {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-} : {
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-};
-
-app.options('*', cors(preflightCorsOptions));
+app.options('*', cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -113,6 +107,28 @@ connectToDatabase()
     const hssmProviderRoutes = require('../routes/hssmProviderRoutes');
     const reportRoutes = require('../routes/reportRoutes');
     const announcementRoutes = require('../routes/announcementRoutes');
+
+    // CORS test endpoint
+    app.get('/api/test-cors', (req, res) => {
+      res.json({
+        message: 'CORS is working!',
+        origin: req.headers.origin,
+        node_env: process.env.NODE_ENV,
+        allowed_origins: allowedOrigins,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Health check endpoint
+    app.get('/api/health', (req, res) => {
+      res.json({
+        status: 'OK',
+        message: 'Server is running',
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+        cors_enabled: true
+      });
+    });
 
     // --- API Route Middleware ---
     app.use("/api/auth", authRoutes);
