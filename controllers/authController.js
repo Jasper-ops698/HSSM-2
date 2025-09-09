@@ -49,12 +49,23 @@ const registerUser = async (req, res) => {
     const verificationToken = require('crypto').randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
+    // Map frontend role names to backend role names
+    let backendRole = role;
+    switch (role) {
+      case 'teacher':
+        backendRole = 'service-provider';
+        break;
+      // Add other mappings if needed in the future
+      default:
+        backendRole = role;
+    }
+
     const user = await User.create({ 
       name, 
       email, 
       phone, 
       password: hashedPassword, 
-      role,
+      role: backendRole,
       verificationToken,
       verificationTokenExpires
     });
