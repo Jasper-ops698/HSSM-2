@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
       enum: [
         'student',
         'staff',
-        'teacher',
+        'service-provider', // Represents Teacher role from frontend
         'credit-controller',
         'HOD',
         'admin',
