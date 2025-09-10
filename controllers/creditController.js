@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const NotificationService = require('../services/notificationService');
 
 // @desc    Get data for Credit Controller Dashboard (students and their credits)
 // @route   GET /api/credit/dashboard
@@ -37,6 +38,9 @@ const addCredits = async (req, res) => {
     user.credits = (user.credits || 0) + amount;
     await user.save();
 
+    // Send notification to the user
+    await NotificationService.sendCreditNotification(userId, amount, 'add');
+
     res.json({
       message: `Successfully added ${amount} credits. New balance is ${user.credits}.`,
       user: {
@@ -74,6 +78,9 @@ const deductCredits = async (req, res) => {
 
     user.credits -= amount;
     await user.save();
+
+    // Send notification to the user
+    await NotificationService.sendCreditNotification(userId, amount, 'deduct');
 
     res.json({
       message: `Successfully deducted ${amount} credits. New balance is ${user.credits}.`,

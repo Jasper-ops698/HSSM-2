@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   createClass,
+  teacherCreateClass,
   getAllClasses,
   updateClass,
   deleteClass,
@@ -19,6 +20,14 @@ router.post(
   protect, // Use the 'protect' function
   verifyRole(['admin', 'HOD']),
   createClass
+);
+
+// Create a new class by teacher
+router.post(
+  '/teacher',
+  protect,
+  verifyRole(['teacher']),
+  teacherCreateClass
 );
 
 // Get all classes (accessible to all authenticated users)

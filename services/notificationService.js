@@ -1,41 +1,70 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Class = require('../models/Class');
 const { analyzeStudentInteraction } = require('./analyticsService');
 
 class NotificationService {
-  static async sendPeriodicStudentNotifications() {
+  static async sendAllPeriodicNotifications() {
+    try {
+      console.log('Starting periodic notifications...');
+      
+      // Send notifications to different user types
+      await this.sendStudentNotifications();
+      await this.sendTeacherNotifications();
+      await this.sendHODNotifications();
+      await this.sendAdminNotifications();
+      
+      console.log('All periodic notifications sent successfully');
+    } catch (error) {
+      console.error('Error sending all periodic notifications:', error);
+    }
+  }
+
+  static async sendStudentNotifications() {
     try {
       // Get all students
       const students = await User.find({ role: 'student' });
 
       for (const student of students) {
-        const analysis = await analyzeStudentInteraction(student._id);
+        try {
+          const analysis = await analyzeStudentInteraction(student._id);
 
-        // Create notification based on performance
-        let notificationType = 'class_enrollment';
-        let title = 'Weekly Performance Update';
-        let message = '';
+          // Create notification based on performance
+          let notificationType = 'performance_update';
+          let title = 'Weekly Performance Update';
+          let message = '';
 
-        if (analysis.summary.overallAttendancePercentage >= 90) {
-          message = `Excellent work! Your attendance is ${analysis.summary.overallAttendancePercentage}%. Keep it up!`;
-        } else if (analysis.summary.overallAttendancePercentage >= 70) {
-          message = `Your attendance is ${analysis.summary.overallAttendancePercentage}%. Consider improving to maintain good standing.`;
-        } else {
-          notificationType = 'admin_alert';
-          title = 'Attendance Alert';
-          message = `Your attendance is ${analysis.summary.overallAttendancePercentage}%. Please contact your HOD for support.`;
-        }
-
-        await Notification.create({
-          recipient: student._id,
-          type: notificationType,
-          title,
-          message,
-          data: {
-            attendancePercentage: analysis.summary.overallAttendancePercentage,
-            totalEnrolled: analysis.summary.totalEnrolled
+          if (analysis.summary.overallAttendancePercentage >= 90) {
+            message = `Excellent work! Your attendance is ${analysis.summary.overallAttendancePercentage}%. Keep it up!`;
+          } else if (analysis.summary.overallAttendancePercentage >= 70) {
+            message = `Your attendance is ${analysis.summary.overallAttendancePercentage}%. Consider improving to maintain good standing.`;
+          } else {
+            notificationType = 'student_absence';
+            title = 'Attendance Alert';
+            message = `Your attendance is ${analysis.summary.overallAttendancePercentage}%. Please contact your HOD for support.`;
           }
-        });
+
+          await Notification.create({
+            recipient: student._id,
+            type: notificationType,
+            title,
+            message,
+            data: {
+              attendancePercentage: analysis.summary.overallAttendancePercentage,
+              totalEnrolled: analysis.summary.totalEnrolled
+            }
+          });
+        } catch (error) {
+          console.error(`Error analyzing student ${student._id}:`, error);
+          // Send a generic notification if analytics fails
+          await Notification.create({
+            recipient: student._id,
+            type: 'performance_update',
+            title: 'Weekly Update',
+            message: 'Your weekly performance summary is being prepared. Please check back later.',
+            data: {}
+          });
+        }
       }
 
       console.log(`Sent periodic notifications to ${students.length} students`);
@@ -44,25 +73,55 @@ class NotificationService {
     }
   }
 
+  static async sendAdminNotifications() {
+    try {
+      // Get all admins
+      const admins = await User.find({ role: 'admin' });
+
+      // Get system-wide statistics
+      const totalStudents = await User.countDocuments({ role: 'student' });
+      const totalTeachers = await User.countDocuments({ role: 'teacher' });
+      const totalClasses = await Class.countDocuments();
+
+      for (const admin of admins) {
+        await Notification.create({
+          recipient: admin._id,
+          type: 'admin_alert',
+          title: 'Weekly System Report',
+          message: `System Overview: ${totalStudents} students, ${totalTeachers} teachers, ${totalClasses} classes.`,
+          data: {
+            totalStudents,
+            totalTeachers,
+            totalClasses
+          }
+        });
+      }
+
+      console.log(`Sent notifications to ${admins.length} admins`);
+    } catch (error) {
+      console.error('Error sending admin notifications:', error);
+    }
+  }
+
   static async sendTeacherNotifications() {
     try {
       // Get all teachers
-      const teachers = await User.find({ role: 'service-provider' }); // teachers are service-providers
+      const teachers = await User.find({ role: 'teacher' });
 
       for (const teacher of teachers) {
         // Get classes taught by this teacher
-        const Class = require('../models/Class');
         const classes = await Class.find({ teacher: teacher._id }).populate('enrolledStudents');
 
         const totalStudents = classes.reduce((sum, cls) => sum + cls.enrolledStudents.length, 0);
+        const totalClasses = classes.length;
 
         await Notification.create({
           recipient: teacher._id,
           type: 'timetable_update',
           title: 'Weekly Teaching Summary',
-          message: `You are teaching ${classes.length} classes with ${totalStudents} total students enrolled.`,
+          message: `You are teaching ${totalClasses} classes with ${totalStudents} total students enrolled.`,
           data: {
-            classesCount: classes.length,
+            classesCount: totalClasses,
             totalStudents
           }
         });
@@ -80,29 +139,46 @@ class NotificationService {
       const hods = await User.find({ role: 'HOD' });
 
       for (const hod of hods) {
+        // Skip HODs without departments
+        if (!hod.department) {
+          console.warn(`HOD ${hod._id} has no department assigned`);
+          continue;
+        }
+
         // Get department statistics
         const department = hod.department;
         const students = await User.find({ role: 'student', department });
+        const teachers = await User.find({ role: 'teacher', department });
+        const classes = await Class.find({ department });
+        
         const totalStudents = students.length;
+        const totalTeachers = teachers.length;
+        const totalClasses = classes.length;
 
         // Calculate department performance
         let excellentCount = 0;
         let poorCount = 0;
 
         for (const student of students) {
-          const analysis = await analyzeStudentInteraction(student._id);
-          if (analysis.summary.overallAttendancePercentage >= 90) excellentCount++;
-          if (analysis.summary.overallAttendancePercentage < 70) poorCount++;
+          try {
+            const analysis = await analyzeStudentInteraction(student._id);
+            if (analysis.summary.overallAttendancePercentage >= 90) excellentCount++;
+            if (analysis.summary.overallAttendancePercentage < 70) poorCount++;
+          } catch (error) {
+            console.error(`Error analyzing student ${student._id} for HOD report:`, error);
+          }
         }
 
         await Notification.create({
           recipient: hod._id,
           type: 'admin_alert',
-          title: 'Department Performance Summary',
-          message: `Department ${department}: ${totalStudents} students, ${excellentCount} excellent performers, ${poorCount} need attention.`,
+          title: 'Department Weekly Report',
+          message: `Department ${department}: ${totalStudents} students, ${totalTeachers} teachers, ${totalClasses} classes. ${excellentCount} excellent performers, ${poorCount} need attention.`,
           data: {
             department,
             totalStudents,
+            totalTeachers,
+            totalClasses,
             excellentCount,
             poorCount
           }
@@ -115,12 +191,55 @@ class NotificationService {
     }
   }
 
-  static async sendAllPeriodicNotifications() {
-    await Promise.all([
-      this.sendPeriodicStudentNotifications(),
-      this.sendTeacherNotifications(),
-      this.sendHODNotifications()
-    ]);
+  static async sendCreditNotification(userId, amount, action) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) return;
+
+      const message = action === 'add' 
+        ? `You have been credited ${amount} credits. New balance: ${user.credits}.`
+        : `You have been debited ${amount} credits. New balance: ${user.credits}.`;
+
+      await Notification.create({
+        recipient: userId,
+        type: 'credit_update',
+        title: 'Credit Update',
+        message,
+        data: {
+          amount,
+          action,
+          newBalance: user.credits
+        }
+      });
+
+      console.log(`Sent credit notification to ${user.name}`);
+    } catch (error) {
+      console.error('Error sending credit notification:', error);
+    }
+  }
+
+  static async notifyCreditControllers(studentName, className, creditsDeducted) {
+    try {
+      const creditControllers = await User.find({ role: 'credit-controller' });
+
+      for (const controller of creditControllers) {
+        await Notification.create({
+          recipient: controller._id,
+          type: 'credit_deduction',
+          title: 'Credit Deduction for Enrollment',
+          message: `${studentName} used ${creditsDeducted} credits to enroll in ${className}.`,
+          data: {
+            studentName,
+            className,
+            creditsDeducted
+          }
+        });
+      }
+
+      console.log(`Notified ${creditControllers.length} credit-controllers`);
+    } catch (error) {
+      console.error('Error notifying credit-controllers:', error);
+    }
   }
 }
 

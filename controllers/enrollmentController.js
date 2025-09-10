@@ -3,6 +3,7 @@ const Class = require('../models/Class');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendFCMNotification = require('../utils/sendFCMNotification');
+const NotificationService = require('../services/notificationService');
 
 /**
  * Student requests to enroll in a class
@@ -25,8 +26,42 @@ exports.requestEnrollment = async (req, res) => {
     }
 
     const student = await User.findById(studentId);
-    if (!student || student.credits < targetClass.creditsRequired) {
-      return res.status(400).json({ message: 'Insufficient credits to enroll.' });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found.' });
+    }
+
+    // Check if student is in the same department as the class
+    if (student.department !== targetClass.department) {
+      return res.status(403).json({ message: 'You can only enroll in classes from your department.' });
+    }
+    if (!student || (targetClass.creditsRequired && student.credits < targetClass.creditsRequired)) {
+      // Notify teacher and HOD about insufficient credits
+      const teacher = await User.findById(targetClass.teacher);
+      const hod = await User.findById(targetClass.HOD);
+
+      const recipients = [];
+      if (teacher?.deviceToken) recipients.push(teacher);
+      if (hod?.deviceToken) recipients.push(hod);
+
+      for (const recipient of recipients) {
+        const notificationMessage = {
+          notification: {
+            title: 'Enrollment Request Denied',
+            body: `${student.name} tried to enroll in ${targetClass.name} but has insufficient credits (${student.credits} available, ${targetClass.creditsRequired || 0} required).`,
+          },
+          token: recipient.deviceToken,
+        };
+        await sendFCMNotification(notificationMessage);
+        await Notification.create({
+          recipient: recipient._id,
+          type: 'enrollment_rejected',
+          title: 'Enrollment Request Denied',
+          message: `${student.name} tried to enroll in ${targetClass.name} but has insufficient credits.`,
+          data: { studentId, classId: classId, requiredCredits: targetClass.creditsRequired || 0, availableCredits: student.credits },
+        });
+      }
+
+      return res.status(400).json({ message: `Insufficient credits to enroll. You have ${student.credits} credits, but ${targetClass.creditsRequired || 0} are required.` });
     }
 
     // Check if already enrolled or pending
@@ -62,6 +97,7 @@ exports.requestEnrollment = async (req, res) => {
       await sendFCMNotification(notificationMessage);
       await Notification.create({
         recipient: recipient._id,
+        type: 'enrollment_approved',
         title: 'New Enrollment Request',
         message: `${student.name} has requested to enroll in ${targetClass.name}.`,
         data: { enrollmentId: newEnrollment._id },
@@ -97,8 +133,15 @@ exports.respondToEnrollment = async (req, res) => {
     if (status === 'Approved') {
       // Deduct credits and add student to class
       const student = enrollment.student;
-      student.credits -= targetClass.creditsRequired;
+      const creditsToDeduct = targetClass.creditsRequired || 0;
+      student.credits -= creditsToDeduct;
       await student.save();
+
+      // Send credit deduction notification
+      await NotificationService.sendCreditNotification(student._id, creditsToDeduct, 'deduct');
+
+      // Notify credit-controllers
+      await NotificationService.notifyCreditControllers(student.name, targetClass.name, creditsToDeduct);
 
       targetClass.enrolledStudents.push(student._id);
       await targetClass.save();
@@ -125,6 +168,7 @@ exports.respondToEnrollment = async (req, res) => {
       await sendFCMNotification(notificationMessage);
       await Notification.create({
         recipient: enrollment.student._id,
+        type: status === 'Approved' ? 'enrollment_approved' : 'enrollment_rejected',
         title: `Enrollment ${status}`,
         message: `Your request for ${targetClass.name} has been ${status.toLowerCase()}.`,
         data: { enrollmentId },

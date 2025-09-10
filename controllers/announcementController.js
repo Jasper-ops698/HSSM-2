@@ -17,7 +17,7 @@ exports.createAnnouncement = async (req, res) => {
       title,
       message,
       department: department || req.user.department,
-      targetRoles: targetRoles || ['all'],
+      targetRoles: targetRoles || (req.user.role === 'admin' ? ['admin', 'HOD', 'teacher'] : ['all']),
       createdBy: req.user._id,
       priority: priority || 'medium',
       startDate: startDate || new Date(),

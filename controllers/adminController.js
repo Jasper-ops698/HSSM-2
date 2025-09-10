@@ -14,35 +14,22 @@ const assignUserRole = async (req, res) => {
       return res.status(404).json({ msg: 'User not found.' });
     }
 
-    // Map frontend role names to backend role names
-    let backendRole = role;
-    switch (role) {
-      case 'teacher':
-        backendRole = 'service-provider';
-        break;
-      // Add other mappings if needed in the future
-      default:
-        backendRole = role;
-    }
-
     // Basic validation for roles that might need a department
     if ((role === 'teacher' || role === 'HOD') && !department) {
       return res.status(400).json({ msg: 'Department is required for this role.' });
     }
 
-    user.role = backendRole;
+    user.role = role;
     if (department) {
         user.department = department;
     }
-
+    
     await user.save();
     res.status(200).json({ success: true, message: 'User role updated successfully.', user });
   } catch (error) {
     res.status(500).json({ msg: 'Error assigning role', error: error.message });
   }
-};
-
-// Placeholder functions to prevent server crash
+};// Placeholder functions to prevent server crash
 
 const addStaff = async (req, res) => {
   try {

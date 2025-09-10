@@ -22,7 +22,7 @@ exports.getDashboardData = async (req, res) => {
     const timetables = await Timetable.find({ classId: { $in: classIds } });
 
     // Get recent notifications for the student
-    const notifications = await Notification.find({ userId: studentId }).sort({ createdAt: -1 }).limit(5);
+    const notifications = await Notification.find({ recipient: studentId }).sort({ createdAt: -1 }).limit(5);
 
     // Get relevant announcements
     const currentDate = new Date();

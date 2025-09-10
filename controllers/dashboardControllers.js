@@ -25,7 +25,7 @@ const getDashboardData = async (req, res) => {
 
     // Get common data for all users
     const [notifications, announcements] = await Promise.all([
-      Notification.find({ userId: user._id }).sort({ createdAt: -1 }).limit(5),
+      Notification.find({ recipient: user._id }).sort({ createdAt: -1 }).limit(5),
       getRelevantAnnouncements(user)
     ]);
 
@@ -45,7 +45,9 @@ const getDashboardData = async (req, res) => {
         data.enrollments = enrollments;
         data.kpi = {
           enrolledClasses: enrollments.length,
-          credits: user.credits || 0
+          credits: user.credits || 0,
+          pendingEnrollments: enrollments.filter(e => e.status === 'Pending').length,
+          approvedEnrollments: enrollments.filter(e => e.status === 'Approved').length
         };
         break;
 
@@ -59,9 +61,9 @@ const getDashboardData = async (req, res) => {
         break;
 
       case 'HOD':
-        const [hodTeachers, hodClasses, hodEnrollments] = await Promise.all([
+        const hodClasses = await Class.find({ department: user.department }).populate('teacher', 'name');
+        const [hodTeachers, hodEnrollments] = await Promise.all([
           User.find({ role: 'teacher', department: user.department }).select('name email'),
-          Class.find({ department: user.department }).populate('teacher', 'name'),
           Enrollment.find({
             class: { $in: hodClasses.map(c => c._id) }
           }).populate('student', 'name email').populate('class', 'name')
@@ -90,10 +92,11 @@ const getDashboardData = async (req, res) => {
         const lowCreditStudents = allStudents.filter(student => (student.credits || 0) < 10);
 
         data.students = allStudents;
+        data.notifications = notifications;
         data.kpi = {
           totalStudents: allStudents.length,
           lowCreditStudents: lowCreditStudents.length,
-          totalCreditsIssued: allStudents.reduce((total, student) => total + (student.credits || 0), 0)
+          totalCreditsInSystem: allStudents.reduce((total, student) => total + (student.credits || 0), 0)
         };
         break;
 
