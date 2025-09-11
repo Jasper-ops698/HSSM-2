@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
       enum: [
         'student',
         'staff',
-        'teacher', // Changed from service-provider
+        'teacher',
         'credit-controller',
         'HOD',
         'admin',
