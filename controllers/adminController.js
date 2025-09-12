@@ -79,7 +79,7 @@ const deleteStaff = async (req, res) => {
     const { id } = req.params;
 
     const staff = await User.findById(id);
-    if (!staff || staff.role !== 'staff') {
+    if (!staff) {
       return res.status(404).json({ message: 'Staff member not found' });
     }
 
@@ -234,7 +234,7 @@ const disableStaff = async (req, res) => {
     const { disabled } = req.body; // true to disable, false to enable
 
     const staff = await User.findById(id);
-    if (!staff || staff.role !== 'staff') {
+    if (!staff) {
       return res.status(404).json({ message: 'Staff member not found' });
     }
 
@@ -261,7 +261,7 @@ const deleteHssmProvider = async (req, res) => {
     const { providerId } = req.params;
 
     const provider = await User.findById(providerId);
-    if (!provider || provider.role !== 'HSSM-provider') {
+    if (!provider) {
       return res.status(404).json({ message: 'HSSM provider not found' });
     }
 
@@ -292,7 +292,7 @@ const disableHssmProvider = async (req, res) => {
     const { disabled } = req.body; // true to disable, false to enable
 
     const provider = await User.findById(providerId);
-    if (!provider || provider.role !== 'HSSM-provider') {
+    if (!provider) {
       return res.status(404).json({ message: 'HSSM provider not found' });
     }
 

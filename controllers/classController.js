@@ -62,8 +62,8 @@ const teacherCreateClass = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide name, description, and credits required.' });
     }
 
-    if (!teacher || teacher.role !== 'teacher') {
-      return res.status(403).json({ success: false, message: 'Only teachers can create classes.' });
+    if (!teacher) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
     }
 
     // Find HOD for the teacher's department

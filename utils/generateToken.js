@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
-const generateToken = (userId, email, name, phone, role = 'user') => {
+const generateToken = (userId, email, name, phone, role = 'user', department = '') => {
   const secretKey = process.env.JWT_SECRET;  // Secret key for signing the token
   const expiresIn = '1h';  // Token expiration time
 
@@ -19,7 +19,8 @@ const generateToken = (userId, email, name, phone, role = 'user') => {
     email,
     name,
     phone, 
-    role
+    role,
+    department
   };
 
   try {

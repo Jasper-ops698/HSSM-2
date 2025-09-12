@@ -136,7 +136,7 @@ const verifyEmail = async (req, res) => {
     await user.save();
 
     // Generate auth token for auto-login after verification
-    const authToken = generateToken(user._id, user.email, user.name, user.phone, user.role);
+    const authToken = generateToken(user._id, user.email, user.name, user.phone, user.role, user.department);
 
     return res.status(200).json({
       message: 'Email verified successfully!',
@@ -147,6 +147,7 @@ const verifyEmail = async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        department: user.department,
         emailVerified: user.emailVerified,
       },
     });
@@ -205,7 +206,7 @@ const loginUser = async (req, res) => {
       }
     }
 
-    const token = generateToken(user._id, user.email, user.name, user.phone, user.role);
+    const token = generateToken(user._id, user.email, user.name, user.phone, user.role, user.department);
 
     return res.status(200).json({
       token,
@@ -215,6 +216,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        department: user.department,
       },
     });
   } catch (err) {

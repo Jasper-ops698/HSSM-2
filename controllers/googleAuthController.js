@@ -30,7 +30,7 @@ const googleAuth = async (req, res) => {
       });
     }
     // Issue your own JWT
-    const token = generateToken(user._id, user.email, user.name, user.phone, user.role);
+    const token = generateToken(user._id, user.email, user.name, user.phone, user.role, user.department);
     res.json({ token, user: user.toJSON() });
   } catch (err) {
 

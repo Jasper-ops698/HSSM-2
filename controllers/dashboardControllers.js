@@ -9,7 +9,7 @@ const Announcement = require('../models/Announcement');
 // @access  Private
 const getDashboardData = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = req.user; // User is already fetched fresh from DB in authMiddleware
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
