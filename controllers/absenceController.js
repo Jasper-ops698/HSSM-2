@@ -7,9 +7,9 @@ const sendFCMNotification = require('../utils/sendFCMNotification');
 // Student or teacher applies for absence
 exports.applyAbsence = async (req, res) => {
   try {
-    const { user, role, class: classId, reason, date, duration } = req.body;
+    const { role, class: classId, reason, date, duration } = req.body;
     const evidence = req.file ? req.file.path : req.body.evidence;
-    const absence = await Absence.create({ user, role, class: classId, reason, date, duration, evidence });
+    const absence = await Absence.create({ user: req.user._id, role, class: classId, reason, date, duration, evidence });
     // Notify HOD/teacher/admin
     const classObj = await require('../models/Class').findById(classId).populate('HOD');
     const recipients = [];

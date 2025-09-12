@@ -19,8 +19,10 @@ const verifyRole = (allowedRoles) => {
       // Decode and verify the JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Attach user data from the token to the request object
-      req.user = decoded;
+      // Attach user data from the token to the request object only if not already set
+      if (!req.user) {
+        req.user = decoded;
+      }
 
       // Check if the user role is authorized
       if (!allowedRoles.includes(req.user.role)) {
