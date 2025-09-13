@@ -49,6 +49,19 @@ incidentSchema.post('save', async function (doc, next) {
     next();
 });
 
+// Define task schema
+const taskSchema = new mongoose.Schema({
+    task: { type: String, required: true }, // Task title or description
+    assignedTo: { type: String, required: true }, // Person assigned to the task
+    id: { type: mongoose.Schema.Types.Mixed, required: true }, // ID as either a number or string
+    dueDate: { type: Date, required: true }, // Due date for the task
+    priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' }, // Priority level with default
+    status: { type: String, enum: ['Pending', 'In Progress', 'Completed', 'Overdue'], default: 'Pending' }, // Task status
+    taskDescription: { type: String }, // Task description, renamed from 'task description'
+    file: { type: String }, // File attachment (optional)
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+});
+
 // Post-save hook to create notifications for overdue tasks
 taskSchema.post('save', async function (doc, next) {
     // Check if task is overdue and not completed
@@ -83,6 +96,9 @@ taskSchema.post('save', async function (doc, next) {
     next();
 });
 
+// NOTE: To implement notifications for tasks nearing their due date,
+// a scheduled job (using a library like node-cron) would be required to run periodically (e.g., daily)
+// and check for tasks with upcoming deadlines. This is a good future enhancement.
 
 // Define asset schema
 const assetSchema = new mongoose.Schema({
@@ -94,22 +110,6 @@ const assetSchema = new mongoose.Schema({
     file: { type: String }, // File attachment (optional)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 });
-
-// Define task schema
-const taskSchema = new mongoose.Schema({
-    task: { type: String, required: true }, // Task title or description
-    assignedTo: { type: String, required: true }, // Person assigned to the task
-    id: { type: mongoose.Schema.Types.Mixed, required: true }, // ID as either a number or string
-    dueDate: { type: Date, required: true }, // Due date for the task
-    priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' }, // Priority level with default
-    taskDescription: { type: String }, // Task description, renamed from 'task description'
-    file: { type: String }, // File attachment (optional)
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-});
-
-// NOTE: To implement notifications for tasks nearing their due date,
-// a scheduled job (using a library like node-cron) would be required to run periodically (e.g., daily)
-// and check for tasks with upcoming deadlines. This is a good future enhancement.
 
 // Define meterReading schema with flattened structure and userId
 const meterReadingSchema = new mongoose.Schema({
