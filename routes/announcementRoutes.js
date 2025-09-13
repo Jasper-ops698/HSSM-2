@@ -5,7 +5,8 @@ const {
   getAnnouncements, 
   getAnnouncementById, 
   updateAnnouncement, 
-  deleteAnnouncement 
+  deleteAnnouncement,
+  toggleAnnouncementStatus
 } = require('../controllers/announcementController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
@@ -38,6 +39,16 @@ router.put(
   protect, 
   verifyRole(['admin', 'HOD', 'teacher']), 
   updateAnnouncement
+);
+
+// @route   PATCH /api/announcements/:id/status
+// @desc    Toggle announcement active status
+// @access  Private (Admin, HOD, Teacher - original creator)
+router.patch(
+  '/:id/status', 
+  protect, 
+  verifyRole(['admin', 'HOD', 'teacher']), 
+  toggleAnnouncementStatus
 );
 
 // @route   DELETE /api/announcements/:id

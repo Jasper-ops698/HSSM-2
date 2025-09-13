@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getDashboardData, addCredits, deductCredits } = require('../controllers/creditController');
+const { getDashboardData, addCredits, deductCredits, getTransactionHistory } = require('../controllers/creditController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
 
@@ -12,6 +12,14 @@ router.get(
   protect,
   verifyRole(['credit-controller', 'admin']), // Protect this route
   getDashboardData
+);
+
+// Get transaction history
+router.get(
+  '/transactions',
+  protect,
+  verifyRole(['credit-controller', 'admin']),
+  getTransactionHistory
 );
 
 // Add credits to a user's account

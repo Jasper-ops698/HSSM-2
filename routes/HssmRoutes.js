@@ -57,6 +57,7 @@ router.get('/meter-readings/trend', protect, verifyRole(['HSSM-provider']), getM
 router.post('/profile', protect, verifyRole(['HSSM-provider']), uploadDocument.single('organogram'), createHospitalProfile);
 router.get('/profile', protect, verifyRole(['HSSM-provider']), getHospitalProfile);
 router.put('/profile', protect, verifyRole(['HSSM-provider']), uploadDocument.single('organogram'), updateHospitalProfile);
+router.post('/share-profile', protect, verifyRole(['HSSM-provider']), shareHospitalProfile);
 
 // --- Report Routes ---
 router.get('/reports', protect, verifyRole(['HSSM-provider']), getAllReports);

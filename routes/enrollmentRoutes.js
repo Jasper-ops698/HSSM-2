@@ -4,6 +4,7 @@ const {
   requestEnrollment,
   respondToEnrollment,
   getAllEnrollments,
+  getEnrollmentsByClass
 } = require('../controllers/enrollmentController');
 const { protect } = require('../middlewares/authMiddleware'); // Correctly import 'protect'
 const verifyRole = require('../middlewares/verifyRole');
@@ -32,6 +33,14 @@ router.get(
   protect, // Use the 'protect' function
   verifyRole(['admin', 'HOD']),
   getAllEnrollments
+);
+
+// Get enrollments for a specific class (for teachers)
+router.get(
+  '/class/:classId',
+  protect,
+  verifyRole(['teacher', 'HOD']),
+  getEnrollmentsByClass
 );
 
 module.exports = router;

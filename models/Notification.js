@@ -17,20 +17,11 @@ const notificationSchema = new mongoose.Schema({
     'role_assigned',
     'credit_update',
     'credit_deduction',
-    'performance_update'
-  ], required: true },
-  type: { type: String, enum: [
-    'service_request',
-    'admin_alert',
-    'class_enrollment',
-    'fee_cleared',
-    'enrollment_approved',
-    'teacher_absence',
-    'student_absence',
-    'substitute_assigned',
-    'timetable_update',
-    'staff_registration',
-    'role_assigned'
+    'performance_update',
+    'incident',
+    'overdue_task',
+    'asset_maintenance',
+    'meter_reading'
   ], required: true },
   title: String,
   message: String,

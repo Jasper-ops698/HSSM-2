@@ -1,4 +1,5 @@
 const { Incident, Asset, Task } = require('../models/Hssm');
+const mongoose = require('mongoose');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get HSSM dashboard data

@@ -9,7 +9,8 @@ const {
   getTeacherClasses,
   addVenueAnnouncement,
   updateVenueAnnouncement,
-  getVenueAnnouncements
+  getVenueAnnouncements,
+  getStudents
 } = require('../controllers/teacherController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
@@ -61,5 +62,10 @@ router.put('/class/:id/venue-announcement/:announcementId', protect, verifyRole(
 // @desc    Get venue announcements for a class
 // @access  Private (Teacher)
 router.get('/class/:id/venue-announcements', protect, verifyRole(['teacher']), getVenueAnnouncements);
+
+// @route   GET /api/teacher/students
+// @desc    Get all students in the teacher's department
+// @access  Private (Teacher)
+router.get('/students', protect, verifyRole(['teacher']), getStudents);
 
 module.exports = router;

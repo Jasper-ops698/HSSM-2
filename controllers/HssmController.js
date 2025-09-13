@@ -364,6 +364,40 @@ const getMeterReadingTrend = async (req, res, next) => {
   }
 };
 
+const shareHospitalProfile = async (req, res) => {
+  try {
+    const { email, message, profileData } = req.body;
+    const userId = req.user.id;
+
+    // Here you would typically integrate with an email service like SendGrid, Nodemailer, etc.
+    // For now, we'll just log the share request and return success
+    console.log('Profile share request:', {
+      from: userId,
+      to: email,
+      message: message,
+      profileData: profileData
+    });
+
+    // TODO: Implement actual email sending
+    // Example with nodemailer:
+    // const transporter = nodemailer.createTransporter({...});
+    // await transporter.sendMail({
+    //   from: 'noreply@hospital.com',
+    //   to: email,
+    //   subject: 'Hospital Profile Shared',
+    //   html: `<p>${message}</p><pre>${JSON.stringify(profileData, null, 2)}</pre>`
+    // });
+
+    res.status(200).json({
+      message: 'Profile shared successfully',
+      sharedWith: email
+    });
+  } catch (error) {
+    console.error('Error sharing profile:', error);
+    res.status(500).json({ message: 'Failed to share profile' });
+  }
+};
+
 module.exports = {
     createIncident,
     getAllIncidents,
@@ -384,6 +418,7 @@ module.exports = {
     createHospitalProfile,
     getHospitalProfile,
     updateHospitalProfile,
+    shareHospitalProfile,
     getAllReports,
     getMeterReadingTrend,
 };

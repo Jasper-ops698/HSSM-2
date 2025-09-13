@@ -33,16 +33,51 @@ incidentSchema.post('save', async function (doc, next) {
 
             if (hssmProviders.length > 0) {
                 const notifications = hssmProviders.map(provider => ({
-                    user: provider._id,
-                    message: `New high-priority incident logged: "${doc.title}"`,
+                    recipient: provider._id,
                     type: 'incident',
-                    link: `/incidents/${doc._id}` // A link to view the incident (frontend route)
+                    title: 'High Priority Incident',
+                    message: `New high-priority incident logged: "${doc.title}"`,
+                    data: { incidentId: doc._id, priority: doc.priority, department: doc.department }
                 }));
                 await Notification.insertMany(notifications);
             }
         } catch (error) {
             console.error('Error creating notification for high-priority incident:', error);
             // We don't want to fail the main operation, so we just log the error.
+        }
+    }
+    next();
+});
+
+// Post-save hook to create notifications for overdue tasks
+taskSchema.post('save', async function (doc, next) {
+    // Check if task is overdue and not completed
+    if (doc.dueDate < new Date() && doc.status !== 'Completed') {
+        try {
+            // Find all users with the 'HSSM-provider' role
+            const hssmProviders = await User.find({ role: 'HSSM-provider' });
+
+            if (hssmProviders.length > 0) {
+                // Check if notification already exists for this task
+                const existingNotification = await Notification.findOne({
+                    type: 'overdue_task',
+                    'data.taskId': doc._id,
+                    read: false
+                });
+
+                if (!existingNotification) {
+                    const notifications = hssmProviders.map(provider => ({
+                        recipient: provider._id,
+                        type: 'overdue_task',
+                        title: 'Overdue Task',
+                        message: `Task "${doc.task}" is overdue. Due date: ${doc.dueDate.toLocaleDateString()}`,
+                        data: { taskId: doc._id, dueDate: doc.dueDate, priority: doc.priority }
+                    }));
+                    await Notification.insertMany(notifications);
+                }
+            }
+        } catch (error) {
+            console.error('Error creating notification for overdue task:', error);
         }
     }
     next();

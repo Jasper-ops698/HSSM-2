@@ -127,7 +127,7 @@ exports.getDashboardData = async (req, res) => {
     const teacherId = req.user.id;
 
     // Find classes taught by the teacher
-    const classes = await Class.find({ teacher: teacherId }).populate('students', 'name email');
+    const classes = await Class.find({ teacher: teacherId }).populate('enrolledStudents', 'name email');
 
     // Get class IDs
     const classIds = classes.map(c => c._id);
@@ -312,5 +312,25 @@ exports.getVenueAnnouncements = async (req, res) => {
   } catch (error) {
     console.error('Error getting venue announcements:', error);
     res.status(500).json({ message: 'Server error while fetching venue announcements.' });
+  }
+};
+
+// @desc    Get all students (for teachers to send announcements)
+// @route   GET /api/teacher/students
+// @access  Private (Teacher)
+exports.getStudents = async (req, res) => {
+  try {
+    const teacher = req.user;
+
+    // Get all students in the same department as the teacher
+    const students = await User.find({ 
+      role: 'student', 
+      department: teacher.department 
+    }).select('name email _id');
+
+    res.status(200).json(students);
+  } catch (error) {
+    console.error('Error getting students:', error);
+    res.status(500).json({ message: 'Server error while fetching students.' });
   }
 };

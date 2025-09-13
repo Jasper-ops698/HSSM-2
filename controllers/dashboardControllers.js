@@ -91,12 +91,25 @@ const getDashboardData = async (req, res) => {
         const allStudents = await User.find({ role: 'student' }).select('name email credits');
         const lowCreditStudents = allStudents.filter(student => (student.credits || 0) < 10);
 
+        // Calculate today's actions
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const CreditTransaction = require('../models/CreditTransaction');
+        const actionsToday = await CreditTransaction.countDocuments({
+          createdAt: { $gte: today, $lt: tomorrow }
+        });
+
         data.students = allStudents;
         data.notifications = notifications;
         data.kpi = {
           totalStudents: allStudents.length,
           lowCreditStudents: lowCreditStudents.length,
-          totalCreditsInSystem: allStudents.reduce((total, student) => total + (student.credits || 0), 0)
+          totalCreditsInSystem: allStudents.reduce((total, student) => total + (student.credits || 0), 0),
+          creditsRemitted: allStudents.reduce((total, student) => total + (student.credits || 0), 0),
+          actionsToday: actionsToday
         };
         break;
 

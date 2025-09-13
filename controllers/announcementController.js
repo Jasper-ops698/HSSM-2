@@ -5,20 +5,24 @@ const Announcement = require('../models/Announcement');
 // @access  Private (Admin, HOD, Teacher)
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { title, message, department, targetRoles, priority, startDate, endDate } = req.body;
+    const { title, message, content, department, targetRoles, priority, startDate, endDate, isActive, active } = req.body;
+    
+    // Handle field name differences (frontend uses 'content', backend uses 'message')
+    const announcementMessage = message || content;
     
     // Basic validation
-    if (!title || !message) {
+    if (!title || !announcementMessage) {
       return res.status(400).json({ message: 'Title and message are required' });
     }
 
     // Create announcement
     const announcement = new Announcement({
       title,
-      message,
+      message: announcementMessage,
       department: department || req.user.department,
       targetRoles: targetRoles || (req.user.role === 'admin' ? ['admin', 'HOD', 'teacher'] : ['all']),
       createdBy: req.user._id,
+      active: active !== undefined ? active : (isActive !== undefined ? isActive : true),
       priority: priority || 'medium',
       startDate: startDate || new Date(),
       endDate: endDate || null
@@ -134,6 +138,14 @@ exports.updateAnnouncement = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this announcement' });
     }
     
+    // Handle field name mappings
+    if (updates.content !== undefined) {
+      announcement.message = updates.content;
+    }
+    if (updates.isActive !== undefined) {
+      announcement.active = updates.isActive;
+    }
+    
     // Update fields
     const allowedUpdates = ['title', 'message', 'active', 'priority', 'targetRoles', 'endDate'];
     allowedUpdates.forEach(field => {
@@ -177,5 +189,45 @@ exports.deleteAnnouncement = async (req, res) => {
   } catch (error) {
     console.error('Error deleting announcement:', error);
     res.status(500).json({ message: 'Server error while deleting announcement' });
+  }
+};
+
+// @desc    Toggle announcement active status
+// @route   PATCH /api/announcements/:id/status
+// @access  Private (Admin, HOD, Teacher - original creator)
+exports.toggleAnnouncementStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    
+    // Find announcement
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    // Check permission - only allow creator, admins, or HODs to toggle status
+    const isCreator = announcement.createdBy.toString() === req.user._id.toString();
+    const canToggle = isCreator || req.user.role === 'admin' || req.user.role === 'HOD';
+    
+    if (!canToggle) {
+      return res.status(403).json({ message: 'Not authorized to toggle this announcement status' });
+    }
+    
+    // Toggle the active status
+    announcement.active = isActive !== undefined ? isActive : !announcement.active;
+    await announcement.save();
+    
+    res.status(200).json({ 
+      message: 'Announcement status updated successfully', 
+      announcement: {
+        _id: announcement._id,
+        active: announcement.active
+      }
+    });
+  } catch (error) {
+    console.error('Error toggling announcement status:', error);
+    res.status(500).json({ message: 'Server error while toggling announcement status' });
   }
 };
