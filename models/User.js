@@ -80,6 +80,25 @@ const userSchema = new mongoose.Schema(
     verificationTokenExpires: {
       type: Date,
     },
+    chatMessages: [{
+      sender: {
+        type: String,
+        enum: ['user', 'bot'],
+        required: true
+      },
+      text: {
+        type: String,
+        required: true
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now
+      },
+      isError: {
+        type: Boolean,
+        default: false
+      }
+    }],
   },
   { timestamps: true }
 );

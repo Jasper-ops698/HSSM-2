@@ -1,24 +1,73 @@
 const express = require('express');
 const axios = require('axios');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const router = express.Router();
 
-// Rate limiter for chat: 10 requests per minute per IP
+// Middleware to authenticate user
+const authenticateUser = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
+
+// Rate limiter for chat: 5 requests per minute per IP (reduced from 10)
 const chatLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 10, // Limit each IP to 10 requests per windowMs
-  message: { success: false, reply: 'Too many chat requests. Please try again later.' },
+  max: 5, // Limit each IP to 5 requests per windowMs (reduced from 10)
+  message: { success: false, reply: 'Too many chat requests. Please wait a minute before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// Health check endpoint for chat service
+router.get('/health', async (req, res) => {
+  try {
+    const isConfigured = !!process.env.GEMINI_API_KEY;
+
+    res.json({
+      success: true,
+      service: 'Chat AI',
+      status: isConfigured ? 'configured' : 'not_configured',
+      timestamp: new Date().toISOString(),
+      rateLimit: {
+        requestsPerMinute: 5,
+        windowMs: 60000
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      service: 'Chat AI',
+      status: 'error',
+      error: error.message
+    });
+  }
 });
 
 // Test endpoint to verify Gemini API key
 router.get('/test', async (req, res) => {
   try {
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'GEMINI_API_KEY not configured' 
+      return res.status(500).json({
+        success: false,
+        message: 'GEMINI_API_KEY not configured'
       });
     }
 
@@ -44,35 +93,71 @@ router.get('/test', async (req, res) => {
     );
 
     if (testResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: 'Gemini API test successful',
         response: testResponse.data.candidates[0].content.parts[0].text
       });
     } else {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Unexpected API response format' 
+      res.status(500).json({
+        success: false,
+        message: 'Unexpected API response format'
       });
     }
   } catch (error) {
     console.error('Gemini API test error:', error.message);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Gemini API test failed',
       error: error.message
     });
   }
 });
 
-router.post('/', chatLimiter, async (req, res) => {
+// Main chat endpoint with rate limiting and user authentication
+router.post('/', authenticateUser, chatLimiter, async (req, res) => {
   try {
     const { message } = req.body;
+    const user = req.user;
+
     if (!message) {
       return res.status(400).json({ success: false, reply: 'Message is required.' });
     }
 
-    console.log('Received chat message:', message);
+    // Input validation and sanitization
+    const sanitizedMessage = message.trim();
+    if (sanitizedMessage.length === 0) {
+      return res.status(400).json({ success: false, reply: 'Message cannot be empty.' });
+    }
+
+    if (sanitizedMessage.length > 2000) {
+      return res.status(400).json({ success: false, reply: 'Message is too long. Please keep it under 2000 characters.' });
+    }
+
+    // Basic content filtering (you can expand this)
+    const blockedPatterns = [
+      /<script/i,
+      /javascript:/i,
+      /on\w+\s*=/i,
+      /<iframe/i,
+      /<object/i,
+      /<embed/i
+    ];
+
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(sanitizedMessage)) {
+        return res.status(400).json({ success: false, reply: 'Message contains invalid content.' });
+      }
+    }
+
+    console.log('Received chat message from user:', user._id, sanitizedMessage);
+
+    // Add user message to chat history
+    user.chatMessages.push({
+      sender: 'user',
+      text: sanitizedMessage,
+      timestamp: new Date()
+    });
 
     // Check if API key is available
     if (!process.env.GEMINI_API_KEY) {
@@ -92,78 +177,285 @@ router.post('/', chatLimiter, async (req, res) => {
     - How to use the reporting features (for HSSM providers).
     - How to manage their profile and 2FA settings.
     
-    User's question: ${message}`;
+    User's question: ${sanitizedMessage}`;
 
     console.log('Making request to Gemini API...');
 
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        contents: [
+    // Add retry logic for rate limit errors
+    let response;
+    let retryCount = 0;
+    const maxRetries = 2;
+
+    while (retryCount <= maxRetries) {
+      try {
+        response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
           {
-            parts: [
+            contents: [
               {
-                text: contextAwarePrompt
+                parts: [
+                  {
+                    text: contextAwarePrompt
+                  }
+                ]
               }
             ]
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            timeout: 30000 // 30 second timeout
           }
-        ]
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000 // 30 second timeout
+        );
+        break; // Success, exit retry loop
+      } catch (error) {
+        if (error.response?.status === 429 && retryCount < maxRetries) {
+          retryCount++;
+          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 2s, 4s
+          console.log(`Rate limit hit, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error; // Re-throw if not a rate limit or max retries reached
       }
-    );
+    }
 
     console.log('Gemini API response received');
-    console.log('Gemini API response structure:', JSON.stringify(response.data, null, 2));
 
     if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
       const reply = response.data.candidates[0].content.parts[0].text;
       console.log('Successfully extracted reply from Gemini response');
+
+      // Add bot response to chat history
+      user.chatMessages.push({
+        sender: 'bot',
+        text: reply,
+        timestamp: new Date()
+      });
+
+      // Save the updated user with new messages
+      await user.save();
+
       res.json({ success: true, reply });
     } else {
       console.error('Unexpected API response structure:', response.data);
+
+      // Add error message to chat history
+      user.chatMessages.push({
+        sender: 'bot',
+        text: 'Got an invalid response from the AI service.',
+        timestamp: new Date(),
+        isError: true
+      });
+      await user.save();
+
       res.status(500).json({ 
         success: false, 
         reply: 'Got an invalid response from the AI service.' 
       });
     }
   } catch (error) {
-    console.error('Error in chat route:', error.message);
-    
+    console.error('Error in chat route:', {
+      message: error.message,
+      status: error.response?.status,
+      userId: req.user?._id,
+      timestamp: new Date().toISOString()
+    });
+
+    const user = req.user;
+
     if (error.response) {
-      console.error('Gemini API error response:', error.response.status, error.response.data);
+      console.error('Gemini API error response:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
       
       if (error.response.status === 400) {
+        const errorMsg = 'Invalid request to AI service. Please try rephrasing your question.';
+        if (user) {
+          user.chatMessages.push({
+            sender: 'bot',
+            text: errorMsg,
+            timestamp: new Date(),
+            isError: true
+          });
+          await user.save();
+        }
         return res.status(500).json({ 
           success: false, 
-          reply: 'Invalid request to AI service. Please try again.' 
+          reply: errorMsg
         });
       } else if (error.response.status === 403) {
+        const errorMsg = 'AI service access denied. The service may be temporarily unavailable.';
+        if (user) {
+          user.chatMessages.push({
+            sender: 'bot',
+            text: errorMsg,
+            timestamp: new Date(),
+            isError: true
+          });
+          await user.save();
+        }
         return res.status(500).json({ 
           success: false, 
-          reply: 'AI service access denied. Please try again later.' 
+          reply: errorMsg
         });
       } else if (error.response.status === 429) {
-        return res.status(500).json({ 
-          success: false, 
-          reply: 'AI service rate limit exceeded. Please try again later.' 
+        console.error('Gemini API rate limit exceeded for user:', user?._id);
+
+        // Provide helpful fallback responses based on common questions
+        const fallbackResponses = {
+          'dashboard': 'You can access your dashboard from the main navigation menu. It shows an overview of your classes, assignments, and system status.',
+          'profile': 'To update your profile, go to Settings > Profile. You can change your personal information, password, and enable two-factor authentication.',
+          'classes': 'To view your classes, navigate to the Classes section. Teachers can create and manage classes, while students can enroll and view assignments.',
+          'reports': 'HSSM providers can generate reports from the Reports section. This includes incident reports, asset management, and maintenance tracking.',
+          'help': 'I\'m here to help! You can ask me about navigating the system, managing classes, generating reports, or updating your profile.',
+          'default': 'The AI assistant is currently busy. Please try again in a few minutes, or check our documentation for common questions and answers.'
+        };
+
+        const message = sanitizedMessage.toLowerCase();
+        let fallbackReply = fallbackResponses.default;
+
+        for (const [key, response] of Object.entries(fallbackResponses)) {
+          if (key !== 'default' && message.includes(key)) {
+            fallbackReply = response;
+            break;
+          }
+        }
+
+        if (user) {
+          user.chatMessages.push({
+            sender: 'bot',
+            text: fallbackReply,
+            timestamp: new Date(),
+            isError: true
+          });
+          await user.save();
+        }
+
+        return res.status(429).json({
+          success: false,
+          reply: fallbackReply,
+          retryAfter: 60,
+          note: 'AI service temporarily unavailable due to high demand'
         });
       }
     } else if (error.code === 'ECONNABORTED') {
-      console.error('Gemini API request timeout');
+      console.error('Gemini API request timeout for user:', user?._id);
+      const errorMsg = 'AI service is taking too long to respond. Please try again in a moment.';
+      if (user) {
+        user.chatMessages.push({
+          sender: 'bot',
+          text: errorMsg,
+          timestamp: new Date(),
+          isError: true
+        });
+        await user.save();
+      }
       return res.status(500).json({ 
         success: false, 
-        reply: 'AI service request timed out. Please try again.' 
+        reply: errorMsg
       });
     }
-    
+
+    const errorMsg = 'The AI assistant is currently unavailable. Please try again later or contact support if the issue persists.';
+    if (user) {
+      user.chatMessages.push({
+        sender: 'bot',
+        text: errorMsg,
+        timestamp: new Date(),
+        isError: true
+      });
+      await user.save();
+    }
+
     res.status(500).json({ 
       success: false, 
-      reply: 'Failed to get a response from the AI. Please try again.' 
+      reply: errorMsg
+    });
+  }
+});
+
+// Get user's chat history
+router.get('/history', authenticateUser, async (req, res) => {
+  try {
+    const user = req.user;
+    const limit = parseInt(req.query.limit) || 50; // Default to last 50 messages
+    const skip = parseInt(req.query.skip) || 0;
+
+    // Get chat messages sorted by timestamp (oldest first for proper pagination)
+    const allMessages = user.chatMessages
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    // Calculate pagination
+    const totalMessages = allMessages.length;
+    const startIndex = Math.max(0, totalMessages - skip - limit);
+    const endIndex = Math.max(0, totalMessages - skip);
+    
+    // Get the messages for this page (most recent messages first)
+    const messages = allMessages.slice(startIndex, endIndex);
+
+    res.json({
+      success: true,
+      messages,
+      total: totalMessages,
+      hasMore: skip < totalMessages - limit
+    });
+  } catch (error) {
+    console.error('Error getting chat history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve chat history'
+    });
+  }
+});
+
+// Clear user's chat history
+router.delete('/history', authenticateUser, async (req, res) => {
+  try {
+    const user = req.user;
+    user.chatMessages = [];
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Chat history cleared successfully'
+    });
+  } catch (error) {
+    console.error('Error clearing chat history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear chat history'
+    });
+  }
+});
+
+// Get chat statistics for user
+router.get('/stats', authenticateUser, async (req, res) => {
+  try {
+    const user = req.user;
+    const messages = user.chatMessages;
+
+    const stats = {
+      totalMessages: messages.length,
+      userMessages: messages.filter(m => m.sender === 'user').length,
+      botMessages: messages.filter(m => m.sender === 'bot').length,
+      errorMessages: messages.filter(m => m.isError).length,
+      firstMessage: messages.length > 0 ? messages[0].timestamp : null,
+      lastMessage: messages.length > 0 ? messages[messages.length - 1].timestamp : null
+    };
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Error getting chat stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve chat statistics'
     });
   }
 });

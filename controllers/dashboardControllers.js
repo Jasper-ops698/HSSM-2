@@ -66,7 +66,7 @@ const getDashboardData = async (req, res) => {
           User.find({ role: 'teacher', department: user.department }).select('name email'),
           Enrollment.find({
             class: { $in: hodClasses.map(c => c._id) }
-          }).populate('student', 'name email').populate('class', 'name')
+          }).populate('student', 'name email credits').populate('class', 'name')
         ]);
 
         const uniqueStudents = new Set();

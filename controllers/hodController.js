@@ -20,7 +20,7 @@ const getDashboardData = async (req, res) => {
     const classIdsInDepartment = classes.map(c => c._id);
     
     const enrollments = await Enrollment.find({ class: { $in: classIdsInDepartment } })
-        .populate('student', 'name email')
+        .populate('student', 'name email credits')
         .populate('class', 'name');
 
     // --- KPI Calculation ---

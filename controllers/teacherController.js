@@ -127,7 +127,7 @@ exports.getDashboardData = async (req, res) => {
     const teacherId = req.user.id;
 
     // Find classes taught by the teacher
-    const classes = await Class.find({ teacher: teacherId }).populate('enrolledStudents', 'name email');
+    const classes = await Class.find({ teacher: teacherId }).populate('enrolledStudents', 'name email credits');
 
     // Get class IDs
     const classIds = classes.map(c => c._id);
