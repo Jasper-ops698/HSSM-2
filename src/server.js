@@ -108,6 +108,7 @@ connectToDatabase()
     const reportRoutes = require('../routes/reportRoutes');
     const announcementRoutes = require('../routes/announcementRoutes');
     const aiRoutes = require('../routes/aiRoutes');
+    const hssmDashboardRoutes = require('../routes/hssmDashboardRoutes');
 
     // CORS test endpoint
     app.get('/api/test-cors', (req, res) => {
@@ -151,6 +152,7 @@ connectToDatabase()
     app.use('/api/reports', reportRoutes);
     app.use('/api/announcements', announcementRoutes);
     app.use('/api/gemini', aiRoutes);
+    app.use('/api/hssm', hssmDashboardRoutes);
 
     // --- Static File Serving ---
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

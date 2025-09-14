@@ -16,14 +16,14 @@ const getDashboardData = asyncHandler(async (req, res) => {
 
     // 2. Incidents by Priority Chart
     const incidentsByPriority = await Incident.aggregate([
-        { $match: { user: mongoose.Types.ObjectId(userId) } },
+        { $match: { user: new mongoose.Types.ObjectId(userId) } },
         { $group: { _id: '$priority', count: { $sum: 1 } } },
         { $sort: { _id: 1 } }
     ]);
 
     // 3. Tasks by Status Chart
     const tasksByStatus = await Task.aggregate([
-        { $match: { user: mongoose.Types.ObjectId(userId) } },
+        { $match: { user: new mongoose.Types.ObjectId(userId) } },
         { $group: { _id: '$status', count: { $sum: 1 } } },
         { $sort: { _id: 1 } }
     ]);

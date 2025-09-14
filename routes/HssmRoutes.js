@@ -20,6 +20,7 @@ const {
   createHospitalProfile,
   getHospitalProfile,
   updateHospitalProfile,
+  shareHospitalProfile,
   getAllReports,
   getMeterReadingTrend,
 } = require('../controllers/HssmController');
