@@ -54,6 +54,80 @@ const getDashboardData = async (req, res) => {
   }
 };
 
+// @desc    Get all students available for enrollment in department
+// @route   GET /api/hod/available-students
+// @access  Private/HOD
+const getAvailableStudents = async (req, res) => {
+  try {
+    const hodDepartment = req.user.department;
+
+    if (!hodDepartment) {
+      return res.status(403).json({ message: 'Access denied. No department assigned to this HOD.' });
+    }
+
+    // Get students who don't have this department assigned or have no department
+    const availableStudents = await User.find({
+      role: 'student',
+      $or: [
+        { department: { $ne: hodDepartment } },
+        { department: { $exists: false } },
+        { department: null },
+        { department: '' }
+      ]
+    }).select('name email credits department');
+
+    res.json({
+      students: availableStudents,
+      department: hodDepartment
+    });
+  } catch (error) {
+    console.error('Error fetching available students:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Enroll student into HOD's department
+// @route   POST /api/hod/enroll-student
+// @access  Private/HOD
+const enrollStudentInDepartment = async (req, res) => {
+  try {
+    const { studentId } = req.body;
+    const hodDepartment = req.user.department;
+
+    if (!hodDepartment) {
+      return res.status(403).json({ message: 'Access denied. No department assigned to this HOD.' });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found.' });
+    }
+
+    if (student.role !== 'student') {
+      return res.status(400).json({ message: 'User is not a student.' });
+    }
+
+    // Update student's department
+    student.department = hodDepartment;
+    await student.save();
+
+    res.json({
+      message: `Student ${student.name} has been enrolled in ${hodDepartment} department.`,
+      student: {
+        _id: student._id,
+        name: student.name,
+        email: student.email,
+        department: student.department
+      }
+    });
+  } catch (error) {
+    console.error('Error enrolling student in department:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getDashboardData,
+  getAvailableStudents,
+  enrollStudentInDepartment,
 };

@@ -1,21 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const absenceController = require('../controllers/absenceController');
-const { protect } = require('../middlewares/authMiddleware');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
-const verifyRole = require('../middlewares/verifyRole');
+const { protect, teacher, hod } = require('../middlewares/authMiddleware');
 
-// Apply for absence (student/teacher)
-router.post('/', protect, upload.single('evidence'), absenceController.applyAbsence);
+// @route   POST /api/absence/report
+// @desc    Report absence (for teachers)
+// @access  Private/Teacher
+router.post('/report', protect, teacher, absenceController.reportAbsence);
 
-// List absences
-router.get('/', protect, absenceController.listAbsences);
+// @route   GET /api/absence
+// @desc    Get absences for HOD's department
+// @access  Private/HOD
+router.get('/', protect, hod, absenceController.getAbsences);
 
-// Get absences for teacher's classes
-router.get('/teacher', protect, verifyRole(['teacher', 'HOD', 'admin']), absenceController.getAbsencesForTeacher);
-
-// Approve or reject absence request
-router.post('/respond', protect, verifyRole(['teacher', 'HOD', 'admin']), absenceController.respondToAbsence);
+// @route   POST /api/absence/assign-replacement
+// @desc    Assign replacement teacher
+// @access  Private/HOD
+router.post('/assign-replacement', protect, hod, absenceController.assignReplacement);
 
 module.exports = router;

@@ -1,103 +1,103 @@
 const Absence = require('../models/Absence');
-const Timetable = require('../models/Timetable');
 const User = require('../models/User');
-const Notification = require('../models/Notification');
-const sendFCMNotification = require('../utils/sendFCMNotification');
+const Timetable = require('../models/Timetable');
+const Announcement = require('../models/Announcement');
 
-// Student or teacher applies for absence
-exports.applyAbsence = async (req, res) => {
+// Report absence
+exports.reportAbsence = async (req, res) => {
   try {
-    const { role, class: classId, reason, date, duration } = req.body;
-    const evidence = req.file ? req.file.path : req.body.evidence;
-    const absence = await Absence.create({ user: req.user._id, role, class: classId, reason, date, duration, evidence });
-    // Notify HOD/teacher/admin
-    const classObj = await require('../models/Class').findById(classId).populate('HOD');
-    const recipients = [];
-    if (classObj?.HOD) recipients.push(classObj.HOD);
-    if (role === 'student') {
-      // Notify class teacher(s)
-      const timetable = await Timetable.findOne({ class: classId });
-      if (timetable) {
-        timetable.entries.forEach(entry => {
-          if (entry.teacher) recipients.push(entry.teacher);
-        });
-      }
-    }
-    // Always notify admin
-    const admins = await User.find({ role: 'admin' });
-    recipients.push(...admins);
-    // Send notification to each recipient
-    for (const recipient of recipients) {
-      await Notification.create({
-        recipient: recipient._id,
-        type: role === 'student' ? 'student_absence' : 'teacher_absence',
-        title: `${role.charAt(0).toUpperCase() + role.slice(1)} Absence Application`,
-        message: `${role.charAt(0).toUpperCase() + role.slice(1)} submitted an absence application for class ${classObj?.name || ''}.`,
-        data: { absenceId: absence._id }
+    const { classId, dateOfAbsence, reason } = req.body;
+    const teacherId = req.user._id;
+    const department = req.user.department;
+
+    const absence = new Absence({
+      teacher: teacherId,
+      class: classId,
+      department,
+      dateOfAbsence,
+      reason,
+    });
+
+    await absence.save();
+
+    // Notify HOD
+    const hod = await User.findOne({ department, role: 'hod' });
+    if (hod) {
+      await Announcement.create({
+        title: 'Teacher Absence Reported',
+        content: `Teacher ${req.user.name} has reported absence for class on ${dateOfAbsence}. Reason: ${reason}`,
+        department,
+        createdBy: req.user._id,
       });
-      if (recipient.deviceToken) {
-        await sendFCMNotification({
-          token: recipient.deviceToken,
-          notification: {
-            title: `${role.charAt(0).toUpperCase() + role.slice(1)} Absence Application`,
-            body: `${role.charAt(0).toUpperCase() + role.slice(1)} submitted an absence application for class ${classObj?.name || ''}.`
-          },
-          data: { absenceId: absence._id.toString() }
-        });
-      }
     }
-    res.status(201).json(absence);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    res.status(201).json({ message: 'Absence reported successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
-// If teacher is absent, auto-assign substitute
-exports.handleTeacherAbsence = async (absenceId) => {
-  const absence = await Absence.findById(absenceId);
-  if (!absence || absence.role !== 'teacher') return;
-  const timetable = await Timetable.findOne({ class: absence.class });
-  if (!timetable) return;
-  // Find substitute teacher (any available teacher not absent)
-  const absentTeacherId = absence.user;
-  const allTeachers = await User.find({ role: 'teacher', isDisabled: false });
-  const absentTeachers = await Absence.find({ role: 'teacher', date: absence.date }).distinct('user');
-  const availableTeachers = allTeachers.filter(t => !absentTeachers.includes(t._id.toString()) && t._id.toString() !== absentTeacherId.toString());
-  if (availableTeachers.length === 0) return;
-  const substitute = availableTeachers[0]; // Simple selection, can be improved
-  // Update timetable
-  timetable.entries.forEach(entry => {
-    if (entry.teacher.toString() === absentTeacherId.toString() && entry.day === absence.date.toLocaleString('en-US', { weekday: 'long' })) {
-      entry.substituteTeacher = substitute._id;
+// Get absences for HOD's department
+exports.getAbsences = async (req, res) => {
+  try {
+    const department = req.user.department;
+    const absences = await Absence.find({ department }).populate('teacher class replacementTeacher');
+    res.json(absences);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Assign replacement teacher
+exports.assignReplacement = async (req, res) => {
+  try {
+    const { absenceId, replacementTeacherId } = req.body;
+
+    const absence = await Absence.findById(absenceId);
+    if (!absence) {
+      return res.status(404).json({ message: 'Absence not found.' });
     }
-  });
-  await timetable.save();
-  // Notify substitute, HOD, students
-  const classObj = await require('../models/Class').findById(absence.class).populate('HOD');
-  const recipients = [];
-  if (classObj?.HOD) recipients.push(classObj.HOD);
-  if (substitute) recipients.push(substitute);
-  // Notify all students in the class
-  if (classObj?.students) recipients.push(...classObj.students);
-  // Always notify admin
-  const admins = await User.find({ role: 'admin' });
-  recipients.push(...admins);
-  for (const recipient of recipients) {
-    await Notification.create({
-      recipient: recipient._id,
-      type: 'substitute_assigned',
-      title: 'Substitute Teacher Assigned',
-      message: `Substitute teacher ${substitute?.name || ''} assigned for class ${classObj?.name || ''}.`,
-      data: { absenceId: absence._id, substituteId: substitute?._id }
+
+    absence.replacementTeacher = replacementTeacherId;
+    absence.status = 'Covered';
+    await absence.save();
+
+    // Update timetable temporarily
+    const timetableEntry = await Timetable.findOne({
+      teacher: absence.teacher,
+      class: absence.class,
+      dayOfWeek: new Date(absence.dateOfAbsence).toLocaleLowerCase(),
     });
-    if (recipient.deviceToken) {
-      await sendFCMNotification({
-        token: recipient.deviceToken,
-        notification: {
-          title: 'Substitute Teacher Assigned',
-          body: `Substitute teacher ${substitute?.name || ''} assigned for class ${classObj?.name || ''}.`
-        },
-        data: { absenceId: absence._id.toString(), substituteId: substitute?._id.toString() }
+
+    if (timetableEntry) {
+      timetableEntry.teacher = replacementTeacherId;
+      await timetableEntry.save();
+    }
+
+    // Notify replacement teacher
+    const replacementTeacher = await User.findById(replacementTeacherId);
+    if (replacementTeacher) {
+      await Announcement.create({
+        title: 'Class Replacement Assigned',
+        content: `You have been assigned to replace ${absence.teacher.name} for class on ${absence.dateOfAbsence}.`,
+        department: absence.department,
+        createdBy: req.user._id,
+      });
+    }
+
+    // Notify students
+    await Announcement.create({
+      title: 'Class Teacher Change',
+      content: `The teacher for your class on ${absence.dateOfAbsence} has changed. New teacher: ${replacementTeacher.name}`,
+      department: absence.department,
+      createdBy: req.user._id,
+    });
+
+    res.json({ message: 'Replacement assigned successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
       });
     }
   }

@@ -16,6 +16,9 @@ const path = require('path'); // <--- IMPORT path MODULE
 const fs = require('fs'); // Add fs module for directory checking
 const connectToDatabase = require("./db"); // Assuming db.js is in the same directory
 const axios = require("axios");
+const cron = require('node-cron');
+const Timetable = require('../models/Timetable');
+const Announcement = require('../models/Announcement');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -109,6 +112,8 @@ connectToDatabase()
     const announcementRoutes = require('../routes/announcementRoutes');
     const aiRoutes = require('../routes/aiRoutes');
     const hssmDashboardRoutes = require('../routes/hssmDashboardRoutes');
+    const timetableRoutes = require('../routes/timetableRoutes');
+    const venueRoutes = require('../routes/venueRoutes');
 
     // CORS test endpoint
     app.get('/api/test-cors', (req, res) => {
@@ -134,7 +139,6 @@ connectToDatabase()
 
     // --- API Route Middleware ---
     app.use("/api/auth", authRoutes);
-    app.use("/api/auth", googleAuthRoutes); // Add Google Auth route
     app.use("/api/enrollments", enrollmentRoutes);
     app.use("/api/classes", classRoutes);
     app.use("/api/dashboard", dashboardRoutes);
@@ -142,7 +146,10 @@ connectToDatabase()
     app.use("/api/hssm", HssmRoutes);
     app.use('/api/chat', chatRoutes);
     app.use('/api/2fa', twofaRoutes);
-    app.use('/api/absences', absenceRoutes);
+    app.use('/api/auth/google', googleAuthRoutes);
+    app.use('/api/timetable', timetableRoutes);
+    app.use('/api/venues', venueRoutes);
+    app.use('/api/absence', absenceRoutes);
     app.use('/api/notifications', notificationRoutes);
     app.use('/api/student', studentRoutes);
     app.use('/api/teacher', teacherRoutes);
@@ -181,6 +188,37 @@ connectToDatabase()
         success: false,
         message: err.message || "Internal Server Error",
       });
+    });
+
+    // --- Scheduled Jobs ---
+    // Automated class reminders
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        const now = new Date();
+        const reminderWindow = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
+
+        // Find classes starting in the next 30 mins that haven't had a reminder sent
+        const upcomingClasses = await Timetable.find({
+          startTime: { $gte: now, $lte: reminderWindow },
+          reminderSent: { $ne: true }
+        }).populate('teacher');
+
+        for (const cls of upcomingClasses) {
+          // Create a targeted announcement for the department
+          await Announcement.create({
+            title: `Class Reminder: ${cls.subject}`,
+            content: `Your class for "${cls.subject}" is starting at ${cls.startTime} in ${cls.venue}. Teacher: ${cls.teacher?.name || 'TBA'}`,
+            department: cls.department,
+            createdBy: 'System',
+          });
+
+          // Mark the class so we don't send another reminder
+          cls.reminderSent = true;
+          await cls.save();
+        }
+      } catch (error) {
+        console.error('Error in class reminder scheduler:', error);
+      }
     });
 
     // --- Start the Server ---

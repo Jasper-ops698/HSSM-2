@@ -32,7 +32,7 @@ exports.requestEnrollment = async (req, res) => {
 
     // Check if student is in the same department as the class
     if (student.department !== targetClass.department) {
-      return res.status(403).json({ message: 'You can only enroll in classes from your department.' });
+      return res.status(403).json({ message: 'You can only enroll in classes from your assigned department. Please contact your HOD to be enrolled in the correct department.' });
     }
     if (!student || (targetClass.creditsRequired && student.credits < targetClass.creditsRequired)) {
       // Notify teacher and HOD about insufficient credits
