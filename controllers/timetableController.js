@@ -292,7 +292,7 @@ exports.getTodayTimetable = async (req, res) => {
   try {
     const studentId = req.user.id;
     const studentDepartment = req.user.department;
-    const today = new Date().toLocaleLowerCase('en-US', { weekday: 'long' });
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
     // Find classes the student is enrolled in
     const enrolledClasses = await Class.find({
