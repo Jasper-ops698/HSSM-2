@@ -12,14 +12,11 @@ exports.getDashboardData = async (req, res) => {
     const studentId = req.user.id;
     const studentDepartment = req.user.department;
 
+    // Get student data including credits
+    const student = await User.findById(studentId).select('name email credits department');
+
     // Find classes the student is enrolled in
-    const studentClasses = await Class.find({ students: studentId }).populate('teacher', 'name');
-
-    // Get class IDs
-    const classIds = studentClasses.map(c => c._id);
-
-    // Find timetables for those classes
-    const timetables = await Timetable.find({ classId: { $in: classIds } });
+    const studentClasses = await Class.find({ enrolledStudents: studentId }).populate('teacher', 'name');
 
     // Get recent notifications for the student
     const notifications = await Notification.find({ recipient: studentId }).sort({ createdAt: -1 }).limit(5);
@@ -43,8 +40,8 @@ exports.getDashboardData = async (req, res) => {
     .limit(5);
 
     res.json({
+      student: student,
       classes: studentClasses,
-      timetables,
       notifications,
       announcements
     });

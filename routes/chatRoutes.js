@@ -432,32 +432,168 @@ router.delete('/history', authenticateUser, async (req, res) => {
   }
 });
 
-// Get chat statistics for user
-router.get('/stats', authenticateUser, async (req, res) => {
+// Public chat endpoint for navigation questions (no authentication required)
+router.post('/public', async (req, res) => {
   try {
-    const user = req.user;
-    const messages = user.chatMessages;
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ success: false, message: "Message is required." });
+    }
 
-    const stats = {
-      totalMessages: messages.length,
-      userMessages: messages.filter(m => m.sender === 'user').length,
-      botMessages: messages.filter(m => m.sender === 'bot').length,
-      errorMessages: messages.filter(m => m.isError).length,
-      firstMessage: messages.length > 0 ? messages[0].timestamp : null,
-      lastMessage: messages.length > 0 ? messages[messages.length - 1].timestamp : null
+    // Input validation and sanitization
+    const sanitizedMessage = message.trim();
+    if (sanitizedMessage.length === 0) {
+      return res.status(400).json({ success: false, message: "Message cannot be empty." });
+    }
+
+    if (sanitizedMessage.length > 500) { // Shorter limit for public chat
+      return res.status(400).json({ success: false, message: "Message is too long. Please keep it under 500 characters." });
+    }
+
+    // Basic content filtering (stricter for public)
+    const blockedPatterns = [
+      /<script/i,
+      /javascript:/i,
+      /on\w+\s*=/i,
+      /<iframe/i,
+      /<object/i,
+      /<embed/i,
+      /password/i,
+      /login/i,
+      /account/i,
+      /personal/i,
+      /private/i
+    ];
+
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(sanitizedMessage)) {
+        return res.status(400).json({
+          success: false,
+          message: "This topic is not available in the public assistant. Please log in for full access."
+        });
+      }
+    }
+
+    console.log('Public navigation chat request:', sanitizedMessage);
+
+    // Enhanced navigation-focused prompt for public users
+    const navigationPrompt = `You are a helpful navigation assistant for the HSSM (Health Systems Support Management) system. You can ONLY help with:
+
+NAVIGATION & SYSTEM USAGE:
+- How to navigate the dashboard and menus
+- How to access different sections (Classes, Students, Teachers, Reports)
+- How to use the main features and interface
+- General system functionality and workflow
+- Getting started guide
+
+RESTRICTED TOPICS (do not answer):
+- Personal account information
+- Login/authentication issues
+- Private data or reports
+- Specific user data
+- Administrative functions
+- Any sensitive information
+
+If the user asks about restricted topics, politely redirect them to log in or explain that you can only help with navigation.
+
+USER QUESTION: ${sanitizedMessage}
+
+Respond as a friendly navigation guide. Keep responses helpful, clear, and focused on system usage. If the question is not about navigation, suggest they log in for more comprehensive help.`;
+
+    // Add retry logic for rate limit errors
+    let response;
+    let retryCount = 0;
+    const maxRetries = 2;
+
+    while (retryCount <= maxRetries) {
+      try {
+        response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            contents: [{
+              parts: [{
+                text: navigationPrompt
+              }]
+            }]
+          },
+          {
+            headers: { "Content-Type": "application/json" },
+            timeout: 25000 // Shorter timeout for public requests
+          }
+        );
+        break; // Success, exit retry loop
+      } catch (error) {
+        if (error.response?.status === 429 && retryCount < maxRetries) {
+          retryCount++;
+          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+          console.log(`Rate limit hit, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      const reply = response.data.candidates[0].content.parts[0].text;
+
+      // Check if the response indicates a restricted topic
+      const restrictedIndicators = [
+        /log in/i,
+        /login/i,
+        /sign in/i,
+        /authentication/i,
+        /account/i,
+        /private/i,
+        /personal/i
+      ];
+
+      const isRestricted = restrictedIndicators.some(pattern => pattern.test(reply));
+
+      res.json({
+        success: true,
+        reply,
+        isNavigationOnly: true,
+        restricted: isRestricted,
+        timestamp: new Date()
+      });
+    } else {
+      console.error('Unexpected AI response structure:', response.data);
+
+      res.status(500).json({
+        success: false,
+        message: 'Sorry, I\'m having trouble responding right now. Please try again or log in for full assistance.'
+      });
+    }
+  } catch (error) {
+    console.error('Error in public chat route:', error);
+
+    // Provide helpful fallback responses for navigation
+    const navigationFallbacks = {
+      'dashboard': 'The dashboard is your main overview page. It shows system statistics and quick access to all features.',
+      'classes': 'The Classes section helps you manage course enrollments and schedules.',
+      'students': 'The Students section allows you to view and manage student information.',
+      'teachers': 'The Teachers section provides tools for instructor management.',
+      'reports': 'The Reports section contains system analytics and performance data.',
+      'help': 'I can help you navigate the system! Ask me about any section or feature.',
+      'default': 'I\'m here to help you navigate the system. Try asking about the dashboard, classes, or other features!'
     };
 
-    res.json({
-      success: true,
-      stats
-    });
-  } catch (error) {
-    console.error('Error getting chat stats:', error);
+    const message = req.body?.message?.toLowerCase() || '';
+    let fallbackReply = navigationFallbacks.default;
+
+    for (const [key, response] of Object.entries(navigationFallbacks)) {
+      if (key !== 'default' && message.includes(key)) {
+        fallbackReply = response;
+        break;
+      }
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve chat statistics'
+      reply: fallbackReply,
+      isNavigationOnly: true,
+      fallback: true
     });
   }
 });
-
-module.exports = router;

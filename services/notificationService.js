@@ -241,6 +241,58 @@ class NotificationService {
       console.error('Error notifying credit-controllers:', error);
     }
   }
+
+  static async notifyTimetableUpdate(department, uploadedBy) {
+    try {
+      console.log(`Sending timetable update notifications for ${department} department`);
+
+      // Get all students in the department
+      const students = await User.find({
+        role: 'student',
+        department: department
+      });
+
+      // Get all teachers in the department
+      const teachers = await User.find({
+        role: 'teacher',
+        department: department
+      });
+
+      // Send notifications to students
+      for (const student of students) {
+        await Notification.create({
+          recipient: student._id,
+          type: 'timetable_update',
+          title: 'Timetable Updated',
+          message: `The timetable for ${department} department has been updated. Please check your schedule for any changes.`,
+          data: {
+            department,
+            updatedBy: uploadedBy,
+            updateType: 'timetable'
+          }
+        });
+      }
+
+      // Send notifications to teachers
+      for (const teacher of teachers) {
+        await Notification.create({
+          recipient: teacher._id,
+          type: 'timetable_update',
+          title: 'Timetable Updated',
+          message: `The timetable for ${department} department has been updated. Your teaching schedule may have changed.`,
+          data: {
+            department,
+            updatedBy: uploadedBy,
+            updateType: 'timetable'
+          }
+        });
+      }
+
+      console.log(`Sent timetable update notifications to ${students.length} students and ${teachers.length} teachers in ${department} department`);
+    } catch (error) {
+      console.error('Error sending timetable update notifications:', error);
+    }
+  }
 }
 
 module.exports = NotificationService;
