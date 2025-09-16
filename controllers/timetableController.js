@@ -6,10 +6,12 @@ const VENUES = require('../config/venues');
 const NotificationService = require('../services/notificationService');
 
 // Helper function to check for venue conflicts
-async function checkVenueConflict(venue, day, startTime, endTime, excludeId = null) {
+async function checkVenueConflict(venueId, day, startTime, endTime, term, week, excludeId = null) {
   const query = {
-    venue: venue,
+    venue: venueId,
     dayOfWeek: day,
+    term: term,
+    week: week,
     $or: [
       { startTime: { $lt: endTime }, endTime: { $gt: startTime } }
     ]
@@ -21,13 +23,19 @@ async function checkVenueConflict(venue, day, startTime, endTime, excludeId = nu
 
   const conflict = await Timetable.findOne(query);
   if (conflict) {
-    throw new Error(`Booking conflict: Venue "${venue}" is already booked from ${conflict.startTime} to ${conflict.endTime} on ${day}.`);
+    const conflictingVenue = await Venue.findById(venueId);
+    throw new Error(`Booking conflict: Venue "${conflictingVenue.name}" is already booked from ${conflict.startTime} to ${conflict.endTime} on ${day}.`);
   }
 }
 
 exports.uploadTimetable = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
+  }
+
+  const { term, startDate, endDate } = req.body;
+  if (!term || !startDate || !endDate) {
+    return res.status(400).json({ message: 'Term, start date, and end date are required.' });
   }
 
   const department = req.user.department;
@@ -39,72 +47,66 @@ exports.uploadTimetable = async (req, res) => {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet);
+    const weeklySchedule = xlsx.utils.sheet_to_json(worksheet);
 
-    const timetableData = []; // Collect data for auto-generation
+    const termStartDate = new Date(startDate);
+    const termEndDate = new Date(endDate);
 
-    for (const row of data) {
-      const { subject, teacherEmail, dayOfWeek, startTime, endTime, venue } = row;
+    // Optional: Clear existing timetable for the term to prevent duplicates
+    await Timetable.deleteMany({ department, term });
 
-      if (!subject || !teacherEmail || !dayOfWeek || !startTime || !endTime || !venue) {
-        continue; // Skip incomplete rows
+    let currentWeekStart = new Date(termStartDate);
+    let weekNumber = 1;
+
+    while (currentWeekStart < termEndDate) {
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+
+      for (const row of weeklySchedule) {
+        const { subject, teacherEmail, dayOfWeek, startTime, endTime } = row;
+
+        if (!subject || !teacherEmail || !dayOfWeek || !startTime || !endTime) {
+          continue; // Skip incomplete rows
+        }
+
+        const teacher = await User.findOne({ email: teacherEmail });
+        if (!teacher) {
+          return res.status(400).json({ message: `Teacher with email ${teacherEmail} not found.` });
+        }
+
+        const newEntry = new Timetable({
+          subject,
+          teacher: teacher._id,
+          department,
+          dayOfWeek,
+          startTime,
+          endTime,
+          venue: null, // Venue is now optional
+          term,
+          week: weekNumber,
+          startDate: currentWeekStart,
+          endDate: currentWeekEnd,
+        });
+
+        await newEntry.save();
       }
 
-      // Validate venue
-      if (!VENUES.includes(venue)) {
-        return res.status(400).json({ message: `Invalid venue: ${venue}` });
-      }
-
-      // Check for conflicts
-      await checkVenueConflict(venue, dayOfWeek, startTime, endTime);
-
-      const teacher = await User.findOne({ email: teacherEmail });
-      if (!teacher) {
-        return res.status(400).json({ message: `Teacher with email ${teacherEmail} not found.` });
-      }
-
-      const newEntry = new Timetable({
-        subject,
-        teacher: teacher._id,
-        department,
-        dayOfWeek,
-        startTime,
-        endTime,
-        venue,
-      });
-
-      await newEntry.save();
-
-      // Collect data for auto-generation
-      timetableData.push({
-        subject,
-        teacherEmail,
-        teacher: teacher._id,
-        dayOfWeek,
-        startTime,
-        endTime,
-        venue
-      });
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+      weekNumber++;
     }
 
-    // Auto-generate classes from the uploaded timetable
+    // Auto-generate classes from the uploaded timetable (using the first week's data as representative)
+    const timetableDataForClassGen = weeklySchedule.map(row => ({ ...row, department }));
     try {
-      const generatedClasses = await autoGenerateClassesFromTimetable(timetableData, department);
+      const generatedClasses = await autoGenerateClassesFromTimetable(timetableDataForClassGen, department);
       console.log(`Successfully auto-generated ${generatedClasses.length} classes`);
     } catch (autoGenError) {
       console.error('Error during auto-generation:', autoGenError);
-      // Don't fail the entire upload if auto-generation fails
     }
 
-    // Send notifications to students and teachers in the department
     await NotificationService.notifyTimetableUpdate(department, req.user.name || req.user.email);
 
-    res.status(201).json({ message: 'Timetable uploaded and processed successfully.' });
-
-    // Send notifications to students and teachers in the department
-    await NotificationService.notifyTimetableUpdate(department, req.user.name || req.user.email);
-
-    res.status(201).json({ message: 'Timetable uploaded and processed successfully.' });
+    res.status(201).json({ message: `Timetable for term "${term}" uploaded and processed successfully for ${weekNumber - 1} weeks.` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -207,11 +209,16 @@ exports.getTimetable = async (req, res) => {
   }
 };
 
-// Get timetable for a specific student (based on their enrolled classes)
+// Get timetable for a specific student for a given week
 exports.getStudentTimetable = async (req, res) => {
   try {
     const studentId = req.user.id;
     const studentDepartment = req.user.department;
+    const { week } = req.query; // Expect week number from query
+
+    if (!week) {
+      return res.status(400).json({ message: 'Week number is required.' });
+    }
 
     // Find classes the student is enrolled in
     const enrolledClasses = await Class.find({
@@ -222,10 +229,11 @@ exports.getStudentTimetable = async (req, res) => {
     // Get subjects from enrolled classes
     const enrolledSubjects = enrolledClasses.map(cls => cls.subject || cls.name);
 
-    // Find timetable entries for these subjects in the student's department
+    // Find timetable entries for these subjects, department, and week
     const timetable = await Timetable.find({
       department: studentDepartment,
-      subject: { $in: enrolledSubjects }
+      subject: { $in: enrolledSubjects },
+      week: parseInt(week, 10)
     }).populate('teacher', 'name email');
 
     // Group by day for better display
@@ -245,23 +253,30 @@ exports.getStudentTimetable = async (req, res) => {
     res.json({
       timetable: groupedTimetable,
       enrolledClasses: enrolledClasses.length,
-      totalEntries: timetable.length
+      totalEntries: timetable.length,
+      week: parseInt(week, 10)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch student timetable.' });
   }
 };
 
-// Get timetable for a specific teacher
+// Get timetable for a specific teacher for a given week
 exports.getTeacherTimetable = async (req, res) => {
   try {
     const teacherId = req.user.id;
     const teacherDepartment = req.user.department;
+    const { week } = req.query;
 
-    // Find timetable entries for this teacher
+    if (!week) {
+      return res.status(400).json({ message: 'Week number is required.' });
+    }
+
+    // Find timetable entries for this teacher, department, and week
     const timetable = await Timetable.find({
       teacher: teacherId,
-      department: teacherDepartment
+      department: teacherDepartment,
+      week: parseInt(week, 10)
     }).populate('teacher', 'name email');
 
     // Group by day for better display
@@ -280,19 +295,33 @@ exports.getTeacherTimetable = async (req, res) => {
 
     res.json({
       timetable: groupedTimetable,
-      totalEntries: timetable.length
+      totalEntries: timetable.length,
+      week: parseInt(week, 10)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch teacher timetable.' });
   }
 };
 
-// Get today's timetable for a student
+// Get today's timetable for a student, considering the current week
 exports.getTodayTimetable = async (req, res) => {
   try {
     const studentId = req.user.id;
     const studentDepartment = req.user.department;
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const today = new Date();
+    const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+    // Find the current week number based on today's date
+    const currentTimetableEntry = await Timetable.findOne({
+      department: studentDepartment,
+      startDate: { $lte: today },
+      endDate: { $gte: today }
+    });
+
+    if (!currentTimetableEntry) {
+      return res.json([]); // No classes scheduled for today
+    }
+    const currentWeek = currentTimetableEntry.week;
 
     // Find classes the student is enrolled in
     const enrolledClasses = await Class.find({
@@ -303,11 +332,12 @@ exports.getTodayTimetable = async (req, res) => {
     // Get subjects from enrolled classes
     const enrolledSubjects = enrolledClasses.map(cls => cls.subject || cls.name);
 
-    // Find today's timetable entries
+    // Find today's timetable entries for the current week
     const todayTimetable = await Timetable.find({
       department: studentDepartment,
       subject: { $in: enrolledSubjects },
-      dayOfWeek: today
+      dayOfWeek: dayOfWeek,
+      week: currentWeek
     }).populate('teacher', 'name email');
 
     // Sort by start time
@@ -323,6 +353,11 @@ exports.getTodayTimetable = async (req, res) => {
 exports.previewTimetable = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
+  }
+
+  const { term } = req.body;
+  if (!term) {
+    return res.status(400).json({ message: 'Term is required for preview.' });
   }
 
   const department = req.user.department;
@@ -345,7 +380,7 @@ exports.previewTimetable = async (req, res) => {
       const { subject, teacherEmail, dayOfWeek, startTime, endTime, venue } = row;
 
       const rowData = {
-        rowNumber: index + 2, // +2 because Excel rows start at 1 and we have headers
+        rowNumber: index + 2, // Excel rows start at 1, plus header
         subject,
         teacherEmail,
         dayOfWeek,
@@ -357,90 +392,45 @@ exports.previewTimetable = async (req, res) => {
         warnings: []
       };
 
-      // Check for missing required fields
-      if (!subject) {
-        rowData.errors.push('Subject is required');
-        rowData.status = 'error';
-      }
-      if (!teacherEmail) {
-        rowData.errors.push('Teacher email is required');
-        rowData.status = 'error';
-      }
-      if (!dayOfWeek) {
-        rowData.errors.push('Day of week is required');
-        rowData.status = 'error';
-      }
-      if (!startTime) {
-        rowData.errors.push('Start time is required');
-        rowData.status = 'error';
-      }
-      if (!endTime) {
-        rowData.errors.push('End time is required');
-        rowData.status = 'error';
-      }
-      if (!venue) {
-        rowData.errors.push('Venue is required');
-        rowData.status = 'error';
-      }
+      // Basic validation for required fields
+      if (!subject) rowData.errors.push('Subject is required');
+      if (!teacherEmail) rowData.errors.push('Teacher email is required');
+      if (!dayOfWeek) rowData.errors.push('Day of week is required');
+      if (!startTime) rowData.errors.push('Start time is required');
+      if (!endTime) rowData.errors.push('End time is required');
+      if (!venue) rowData.errors.push('Venue is required');
 
-      // If we have all required fields, do additional validation
-      if (subject && teacherEmail && dayOfWeek && startTime && endTime && venue) {
-        // Validate venue
+      if (rowData.errors.length > 0) {
+        rowData.status = 'error';
+      } else {
+        // Advanced validation
         if (!VENUES.includes(venue)) {
-          rowData.errors.push(`Invalid venue: ${venue}. Valid venues: ${VENUES.join(', ')}`);
+          rowData.errors.push(`Invalid venue: ${venue}.`);
           rowData.status = 'error';
         }
 
-        // Check if teacher exists
         const teacher = await User.findOne({ email: teacherEmail });
         if (!teacher) {
-          rowData.errors.push(`Teacher with email ${teacherEmail} not found`);
-          rowData.status = 'error';
-        } else if (teacher.role !== 'teacher') {
-          rowData.errors.push(`User ${teacherEmail} is not a teacher`);
+          rowData.errors.push(`Teacher with email ${teacherEmail} not found.`);
           rowData.status = 'error';
         } else {
           rowData.teacherName = teacher.name;
         }
 
-        // Check for venue conflicts
+        // Simulate conflict check for the first week of the term
         try {
-          await checkVenueConflict(venue, dayOfWeek, startTime, endTime);
+          await checkVenueConflict(venue, dayOfWeek, startTime, endTime, term, 1);
         } catch (conflictError) {
-          rowData.errors.push(conflictError.message);
-          rowData.status = 'error';
-        }
-
-        // Validate time format
-        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(startTime)) {
-          rowData.errors.push('Invalid start time format. Use HH:MM (24-hour format)');
-          rowData.status = 'error';
-        }
-        if (!timeRegex.test(endTime)) {
-          rowData.errors.push('Invalid end time format. Use HH:MM (24-hour format)');
-          rowData.status = 'error';
-        }
-
-        // Check if end time is after start time
-        if (timeRegex.test(startTime) && timeRegex.test(endTime)) {
-          const start = new Date(`1970-01-01T${startTime}:00`);
-          const end = new Date(`1970-01-01T${endTime}:00`);
-          if (end <= start) {
-            rowData.errors.push('End time must be after start time');
-            rowData.status = 'error';
-          }
+          rowData.warnings.push(conflictError.message); // Treat as a warning in preview
         }
       }
 
       previewData.push(rowData);
-
-      // Collect all errors and warnings
       if (rowData.errors.length > 0) {
-        errors.push(...rowData.errors.map(error => `Row ${rowData.rowNumber}: ${error}`));
+        errors.push(...rowData.errors.map(e => `Row ${rowData.rowNumber}: ${e}`));
       }
       if (rowData.warnings.length > 0) {
-        warnings.push(...rowData.warnings.map(warning => `Row ${rowData.rowNumber}: ${warning}`));
+        warnings.push(...rowData.warnings.map(w => `Row ${rowData.rowNumber}: ${w}`));
       }
     }
 
@@ -449,9 +439,9 @@ exports.previewTimetable = async (req, res) => {
       data: previewData,
       summary: {
         totalRows: data.length,
-        validRows: previewData.filter(row => row.status === 'valid').length,
-        errorRows: previewData.filter(row => row.status === 'error').length,
-        warningRows: previewData.filter(row => row.warnings.length > 0).length
+        validRows: previewData.filter(r => r.status === 'valid').length,
+        errorRows: previewData.filter(r => r.status === 'error').length,
+        warningRows: previewData.filter(r => r.warnings.length > 0).length,
       },
       errors,
       warnings

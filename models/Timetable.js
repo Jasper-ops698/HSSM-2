@@ -9,13 +9,14 @@ const timetableSchema = new mongoose.Schema({
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
   venue: { 
-    type: String, 
-    required: true,
-    enum: {
-      values: VENUES,
-      message: '"{VALUE}" is not a valid venue.'
-    }
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Venue',
+    required: false 
   },
+  term: { type: String, required: true },
+  week: { type: Number, required: true },
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true },
   reminderSent: { type: Boolean, default: false },
 }, { timestamps: true });
 

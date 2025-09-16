@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Advanced AI System Test Suite
-const BASE_URL = 'http://localhost:5000/api/gemini';
+const BASE_URL = 'https://hssm-2-1.onrender.com/api/gemini';
 
 class AdvancedAITester {
   constructor(baseUrl) {

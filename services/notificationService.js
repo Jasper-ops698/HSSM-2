@@ -293,6 +293,37 @@ class NotificationService {
       console.error('Error sending timetable update notifications:', error);
     }
   }
+
+  static async notifyVenueUpdate(timetableEntry) {
+    try {
+      const { subject, teacher, venue, dayOfWeek, startTime, endTime, department } = timetableEntry;
+
+      // Find all students in the department
+      const students = await User.find({ department, role: 'student' });
+
+      const notificationPromises = students.map(student => {
+        return Notification.create({
+          recipient: student._id,
+          type: 'venue_update',
+          title: `Venue Change for ${subject}`,
+          message: `The venue for ${subject} on ${dayOfWeek} at ${startTime} has been changed to ${venue.name}.`,
+          data: {
+            subject,
+            teacher: teacher.name,
+            venue: venue.name,
+            dayOfWeek,
+            startTime,
+            endTime,
+          }
+        });
+      });
+
+      await Promise.all(notificationPromises);
+      console.log(`Sent venue update notifications for ${subject} to ${students.length} students.`);
+    } catch (error) {
+      console.error('Error sending venue update notifications:', error);
+    }
+  }
 }
 
 module.exports = NotificationService;

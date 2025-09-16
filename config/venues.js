@@ -9,11 +9,25 @@ const VENUES = [
   'Classroom 3',
   'Classroom 4',
   'Classroom 5',
-  'Dining Hall',
-  'Communication room',
   'GYM Class',
+  'Dining Hall',
+  'Communication Room',
+  'BME Lab',
   'BME Workshop',
-  'BME lab'
+  'Computer Lab',
+  'Pharmacy Lab',
+  'Skills Lab room 1',
+  'Skills Lab room 2',
+  'Skills Lab room 3',
+  'Skills Lab room 4',
+  'Skills Lab room 5',
+  'Skills Lab room 6',
+  'Skills Lab room 7',
+  'Skills Lab room 8',
+  'Skills Lab room 9',
+  'Skills Lab room 10',
+  'Main Skills Lab',
+  'Any unoccupied Balcony(notify your teacher)',
 ];
 
 module.exports = VENUES;

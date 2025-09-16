@@ -127,15 +127,33 @@ exports.getDashboardData = async (req, res) => {
     const teacherId = req.user.id;
 
     // Find classes taught by the teacher
-    const classes = await Class.find({ teacher: teacherId }).populate('enrolledStudents', 'name email credits');
+    const classes = await Class.find({ teacher: teacherId });
 
-    // Get class IDs
-    const classIds = classes.map(c => c._id);
+    const totalClasses = classes.length;
 
-    // Find all absences for the students in those classes
-    const absences = await Absence.find({ classId: { $in: classIds } }).populate('studentId', 'name');
+    // Calculate total unique students
+    const studentIds = new Set();
+    classes.forEach(c => {
+      if (c.enrolledStudents) {
+        c.enrolledStudents.forEach(studentId => {
+          studentIds.add(studentId.toString());
+        });
+      }
+    });
+    const totalStudents = studentIds.size;
 
-    res.json({ classes, absences });
+    // For recent activity, you could fetch recent enrollments or announcements
+    // This is a placeholder
+    const recentActivity = [
+      { description: "New student enrolled in Advanced Physics", timestamp: new Date() },
+      { description: "Class 'Intro to Chemistry' was updated", timestamp: new Date() }
+    ];
+
+    res.json({
+      totalClasses,
+      totalStudents,
+      recentActivity
+    });
   } catch (error) {
     console.error('Error fetching teacher dashboard data:', error);
     res.status(500).json({ msg: 'Server Error' });

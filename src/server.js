@@ -19,6 +19,8 @@ const axios = require("axios");
 const cron = require('node-cron');
 const Timetable = require('../models/Timetable');
 const Announcement = require('../models/Announcement');
+const http = require('http');
+const { Server } = require("socket.io");
 
 // Load environment variables from .env file
 dotenv.config();
@@ -221,9 +223,28 @@ connectToDatabase()
       }
     });
 
+    // --- Socket.io Configuration ---
+    const server = http.createServer(app);
+    const io = new Server(server, {
+      cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"]
+      }
+    });
+
+    io.on('connection', (socket) => {
+      console.log('a user connected');
+      socket.on('disconnect', () => {
+        console.log('user disconnected');
+      });
+    });
+
+    // Export io for use in other modules
+    module.exports.io = io;
+
     // --- Start the Server ---
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });
   })
