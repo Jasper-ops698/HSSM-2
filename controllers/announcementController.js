@@ -231,3 +231,12 @@ exports.toggleAnnouncementStatus = async (req, res) => {
     res.status(500).json({ message: 'Server error while toggling announcement status' });
   }
 };
+
+module.exports = {
+  createAnnouncement: exports.createAnnouncement,
+  getAnnouncements: exports.getAnnouncements,
+  getAnnouncementById: exports.getAnnouncementById,
+  updateAnnouncement: exports.updateAnnouncement,
+  deleteAnnouncement: exports.deleteAnnouncement,
+  toggleAnnouncementStatus: exports.toggleAnnouncementStatus,
+};

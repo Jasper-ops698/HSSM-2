@@ -50,3 +50,7 @@ exports.getDashboardData = async (req, res) => {
     res.status(500).json({ msg: 'Server Error' });
   }
 };
+
+module.exports = {
+  getDashboardData: exports.getDashboardData,
+};

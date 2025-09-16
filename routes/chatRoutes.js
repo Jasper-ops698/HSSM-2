@@ -597,3 +597,5 @@ Respond as a friendly navigation guide. Keep responses helpful, clear, and focus
     });
   }
 });
+
+module.exports = router;

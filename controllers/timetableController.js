@@ -460,3 +460,12 @@ exports.previewTimetable = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+module.exports = {
+  uploadTimetable: exports.uploadTimetable,
+  getTimetable: exports.getTimetable,
+  getStudentTimetable: exports.getStudentTimetable,
+  getTeacherTimetable: exports.getTeacherTimetable,
+  getTodayTimetable: exports.getTodayTimetable,
+  previewTimetable: exports.previewTimetable,
+};

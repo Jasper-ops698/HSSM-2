@@ -226,3 +226,10 @@ exports.getEnrollmentsByClass = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
+
+module.exports = {
+  requestEnrollment: exports.requestEnrollment,
+  respondToEnrollment: exports.respondToEnrollment,
+  getAllEnrollments: exports.getAllEnrollments,
+  getEnrollmentsByClass: exports.getEnrollmentsByClass,
+};

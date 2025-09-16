@@ -334,3 +334,16 @@ exports.getStudents = async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching students.' });
   }
 };
+
+module.exports = {
+  createClass: exports.createClass,
+  updateClass: exports.updateClass,
+  deleteClass: exports.deleteClass,
+  getTeacherClasses: exports.getTeacherClasses,
+  getDashboardData: exports.getDashboardData,
+  markAttendance: exports.markAttendance,
+  addVenueAnnouncement: exports.addVenueAnnouncement,
+  updateVenueAnnouncement: exports.updateVenueAnnouncement,
+  getVenueAnnouncements: exports.getVenueAnnouncements,
+  getStudents: exports.getStudents,
+};

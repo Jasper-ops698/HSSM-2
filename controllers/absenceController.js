@@ -98,3 +98,9 @@ exports.assignReplacement = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+module.exports = {
+  reportAbsence: exports.reportAbsence,
+  getAbsences: exports.getAbsences,
+  assignReplacement: exports.assignReplacement,
+};
