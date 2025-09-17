@@ -146,6 +146,23 @@ connectToDatabase()
     app.use("/api/classes", classRoutes);
     app.use("/api/dashboard", dashboardRoutes);
     app.use('/api/bookings', bookingRoutes);
+    app.use('/api/venues', venueRoutes);
+    app.use('/api/absences', absenceRoutes);
+    app.use('/api/admin', adminRoutes);
+    app.use('/api/ai', aiRoutes);
+    app.use('/api/announcements', announcementRoutes);
+    app.use('/api/credits', creditRoutes);
+    app.use('/api/auth/google', googleAuthRoutes);
+    app.use('/api/hod', hodRoutes);
+    app.use('/api/hssm-dashboard', hssmDashboardRoutes);
+    app.use('/api/hssm-provider', hssmProviderRoutes);
+    app.use('/api/hssm', HssmRoutes);
+    app.use('/api/notifications', notificationRoutes);
+    app.use('/api/reports', reportRoutes);
+    app.use('/api/students', studentRoutes);
+    app.use('/api/teachers', teacherRoutes);
+    app.use('/api/timetables', timetableRoutes);
+    app.use('/api/twofa', twofaRoutes);
 
     // Serve uploaded files statically
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
