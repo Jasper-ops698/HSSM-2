@@ -4,7 +4,7 @@ const NotificationService = require('../services/notificationService');
 
 // @desc    Get data for Credit Controller Dashboard (students and their credits)
 // @route   GET /api/credit/dashboard
-// @access  Private/Credit-Controller
+// @access  Private/Credit-Controller/Admin/Teacher
 const getDashboardData = async (req, res) => {
   try {
     // Fetch all students and their credit balances
@@ -33,7 +33,7 @@ const getDashboardData = async (req, res) => {
 
 // @desc    Add credits to a user's account
 // @route   POST /api/credit/add
-// @access  Private/Credit-Controller
+// @access  Private/Credit-Controller/Admin/Teacher
 const addCredits = async (req, res) => {
   const { userId, amount, reason = 'Manual credit addition' } = req.body;
 
@@ -83,7 +83,7 @@ const addCredits = async (req, res) => {
 
 // @desc    Deduct credits from a user's account
 // @route   POST /api/credit/deduct
-// @access  Private/Credit-Controller
+// @access  Private/Credit-Controller/Admin/Teacher
 const deductCredits = async (req, res) => {
   const { userId, amount, reason = 'Manual credit deduction' } = req.body;
 
@@ -138,7 +138,7 @@ const deductCredits = async (req, res) => {
 
 // @desc    Get credit transaction history
 // @route   GET /api/credit/transactions
-// @access  Private/Credit-Controller
+// @access  Private/Credit-Controller/Admin/Teacher
 const getTransactionHistory = async (req, res) => {
   try {
     const { page = 1, limit = 20, userId, action, startDate, endDate } = req.query;

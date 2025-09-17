@@ -14,11 +14,11 @@ const verifyRole = require('../middlewares/verifyRole');
 
 // --- Class Routes ---
 
-// Create a new class (only admin or HOD)
+// Create a new class (admin, HOD, or teacher)
 router.post(
   '/',
   protect, // Use the 'protect' function
-  verifyRole(['admin', 'HOD']),
+  verifyRole(['admin', 'HOD', 'teacher']),
   createClass
 );
 
@@ -33,19 +33,19 @@ router.post(
 // Get all classes (accessible to all authenticated users)
 router.get('/', protect, getAllClasses); // Use the 'protect' function
 
-// Update a class (only admin or HOD)
+// Update a class (admin, HOD, or teacher)
 router.put(
   '/:id',
   protect, // Use the 'protect' function
-  verifyRole(['admin', 'HOD']),
+  verifyRole(['admin', 'HOD', 'teacher']),
   updateClass
 );
 
-// Delete a class (only admin or HOD)
+// Delete a class (admin, HOD, or teacher)
 router.delete(
   '/:id',
   protect, // Use the 'protect' function
-  verifyRole(['admin', 'HOD']),
+  verifyRole(['admin', 'HOD', 'teacher']),
   deleteClass
 );
 

@@ -10,7 +10,7 @@ const verifyRole = require('../middlewares/verifyRole');
 router.get(
   '/dashboard',
   protect,
-  verifyRole(['credit-controller', 'admin']), // Protect this route
+  verifyRole(['credit-controller', 'admin', 'teacher']), // Added teacher role
   getDashboardData
 );
 
@@ -18,7 +18,7 @@ router.get(
 router.get(
   '/transactions',
   protect,
-  verifyRole(['credit-controller', 'admin']),
+  verifyRole(['credit-controller', 'admin', 'teacher']), // Added teacher role
   getTransactionHistory
 );
 
@@ -26,7 +26,7 @@ router.get(
 router.post(
   '/add',
   protect,
-  verifyRole(['credit-controller', 'admin']), // Protect this route
+  verifyRole(['credit-controller', 'admin', 'teacher']), // Added teacher role
   addCredits
 );
 
@@ -34,7 +34,7 @@ router.post(
 router.post(
   '/deduct',
   protect,
-  verifyRole(['credit-controller', 'admin']), // Protect this route
+  verifyRole(['credit-controller', 'admin', 'teacher']), // Added teacher role
   deductCredits
 );
 

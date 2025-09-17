@@ -27,11 +27,11 @@ router.post(
   respondToEnrollment
 );
 
-// Admin or HOD gets all enrollment requests
+// Admin, HOD, or teacher gets all enrollment requests
 router.get(
   '/all',
   protect, // Use the 'protect' function
-  verifyRole(['admin', 'HOD']),
+  verifyRole(['admin', 'HOD', 'teacher']),
   getAllEnrollments
 );
 

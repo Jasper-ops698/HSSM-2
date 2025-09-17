@@ -51,10 +51,25 @@ const getDashboardData = async (req, res) => {
 
       case 'teacher':
         const classes = await Class.find({ teacher: user._id }).populate('teacher', 'name');
+        
+        // Get all students enrolled in teacher's classes
+        const teacherClassIds = classes.map(c => c._id);
+        const enrolledStudents = await Enrollment.find({
+          class: { $in: teacherClassIds },
+          status: 'Approved'
+        }).populate('student', 'name email credits');
+        
+        // Get unique students
+        const uniqueStudents = [...new Map(enrolledStudents.map(e => 
+          [e.student._id.toString(), e.student])).values()];
+        
         data.classes = classes;
+        data.students = uniqueStudents;
         data.kpi = {
           totalClasses: classes.length,
-          enrolledStudents: classes.reduce((total, cls) => total + (cls.enrolledStudents?.length || 0), 0)
+          enrolledStudents: classes.reduce((total, cls) => total + (cls.enrolledStudents?.length || 0), 0),
+          totalStudents: uniqueStudents.length,
+          totalCredits: uniqueStudents.reduce((total, student) => total + (student.credits || 0), 0)
         };
         break;
 
@@ -67,10 +82,10 @@ const getDashboardData = async (req, res) => {
           }).populate('student', 'name email credits').populate('class', 'name')
         ]);
 
-        const uniqueStudents = new Set();
+        const uniqueHodStudents = new Set();
         hodEnrollments.forEach(enrollment => {
           if (enrollment.status === 'Approved') {
-            uniqueStudents.add(enrollment.student._id.toString());
+            uniqueHodStudents.add(enrollment.student._id.toString());
           }
         });
 
@@ -79,7 +94,7 @@ const getDashboardData = async (req, res) => {
         data.enrollments = hodEnrollments;
         data.totalTeachers = hodTeachers.length;
         data.totalClasses = hodClasses.length;
-        data.totalStudents = uniqueStudents.size;
+        data.totalStudents = uniqueHodStudents.size;
         data.pendingEnrollmentsCount = hodEnrollments.filter(e => e.status === 'Pending').length;
         break;
 
