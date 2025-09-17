@@ -114,15 +114,15 @@ const getDashboardData = async (req, res) => {
         const totalUsers = await User.countDocuments();
 
         // Fetch the actual data for admin dashboard
-        const allStudents = await User.find({ role: 'student' }).select('name email department credits');
-        const allTeachers = await User.find({ role: 'teacher' }).select('name email department');
-        const allClasses = await Class.find().populate('teacher', 'name');
-        const allEnrollments = await Enrollment.find().populate('student', 'name').populate('class', 'name');
+        const adminStudents = await User.find({ role: 'student' }).select('name email department credits');
+        const adminTeachers = await User.find({ role: 'teacher' }).select('name email department');
+        const adminClasses = await Class.find().populate('teacher', 'name');
+        const adminEnrollments = await Enrollment.find().populate('student', 'name').populate('class', 'name');
 
-        data.students = allStudents;
-        data.teachers = allTeachers;
-        data.classes = allClasses;
-        data.enrollments = allEnrollments;
+        data.students = adminStudents;
+        data.teachers = adminTeachers;
+        data.classes = adminClasses;
+        data.enrollments = adminEnrollments;
         data.studentCount = studentCount;
         data.teacherCount = teacherCount;
         data.classCount = classCount;
