@@ -65,8 +65,9 @@ exports.teacher = (req, res, next) => {
   }
 };
 
+// Export all middleware functions
 module.exports = {
   protect: exports.protect,
   admin: exports.admin,
-  teacher: exports.teacher,
+  teacher: exports.teacher
 };

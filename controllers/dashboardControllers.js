@@ -113,13 +113,23 @@ const getDashboardData = async (req, res) => {
           Enrollment.countDocuments()
         ]);
 
-        data.kpi = {
-          studentCount,
-          teacherCount,
-          classCount,
-          enrollmentCount,
-          totalUsers: await User.countDocuments()
-        };
+        // Fetch the actual data for admin dashboard
+        const [allStudents, allTeachers, allClasses, allEnrollments] = await Promise.all([
+          User.find({ role: 'student' }).select('name email department credits'),
+          User.find({ role: 'teacher' }).select('name email department'),
+          Class.find().populate('teacher', 'name'),
+          Enrollment.find().populate('student', 'name').populate('class', 'name')
+        ]);
+
+        data.students = allStudents;
+        data.teachers = allTeachers;
+        data.classes = allClasses;
+        data.enrollments = allEnrollments;
+        data.studentCount = studentCount;
+        data.teacherCount = teacherCount;
+        data.classCount = classCount;
+        data.enrollmentCount = enrollmentCount;
+        data.totalUsers = await User.countDocuments();
         break;
 
       case 'HSSM-provider':
