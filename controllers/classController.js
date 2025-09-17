@@ -109,8 +109,7 @@ const getAllClasses = async (req, res) => {
     // Admins can see all classes (no filter). Students can also see all classes.
 
     const classes = await Class.find(query)
-      .populate('teacher', 'name email')
-      .populate('venue', 'name');
+      .populate('teacher', 'name email');
       
     res.status(200).json(classes);
   } catch (error) {

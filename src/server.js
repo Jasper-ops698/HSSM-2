@@ -148,7 +148,7 @@ connectToDatabase()
     app.use("/api/dashboard", dashboardRoutes);
     app.use('/api/bookings', bookingRoutes);
     app.use('/api/venues', venueRoutes);
-    app.use('/api/absences', absenceRoutes);
+    app.use('/api/absence', absenceRoutes);
     app.use('/api/admin', adminRoutes);
     app.use('/api/ai', aiRoutes);
     app.use('/api/announcements', announcementRoutes);
@@ -160,8 +160,8 @@ connectToDatabase()
     app.use('/api/hssm', HssmRoutes);
     app.use('/api/notifications', notificationRoutes);
     app.use('/api/reports', reportRoutes);
-    app.use('/api/students', studentRoutes);
-    app.use('/api/teachers', teacherRoutes);
+    app.use('/api/student', studentRoutes);
+    app.use('/api/teacher', teacherRoutes);
     app.use('/api/timetables', timetableRoutes);
     app.use('/api/twofa', twofaRoutes);
     app.use('/api/services', serviceRoutes);

@@ -43,12 +43,10 @@ const getDashboardData = async (req, res) => {
           },
         });
         data.enrollments = enrollments;
-        data.kpi = {
-          enrolledClasses: enrollments.length,
-          credits: user.credits || 0,
-          pendingEnrollments: enrollments.filter(e => e.status === 'Pending').length,
-          approvedEnrollments: enrollments.filter(e => e.status === 'Approved').length
-        };
+        data.enrolledClassesCount = enrollments.length;
+        data.credits = user.credits || 0;
+        data.pendingEnrollmentsCount = enrollments.filter(e => e.status === 'Pending').length;
+        data.approvedEnrollmentsCount = enrollments.filter(e => e.status === 'Approved').length;
         break;
 
       case 'teacher':
@@ -79,12 +77,10 @@ const getDashboardData = async (req, res) => {
         data.teachers = hodTeachers;
         data.classes = hodClasses;
         data.enrollments = hodEnrollments;
-        data.kpi = {
-          totalTeachers: hodTeachers.length,
-          totalClasses: hodClasses.length,
-          totalStudents: uniqueStudents.size,
-          pendingEnrollments: hodEnrollments.filter(e => e.status === 'Pending').length
-        };
+        data.totalTeachers = hodTeachers.length;
+        data.totalClasses = hodClasses.length;
+        data.totalStudents = uniqueStudents.size;
+        data.pendingEnrollmentsCount = hodEnrollments.filter(e => e.status === 'Pending').length;
         break;
 
       case 'credit-controller':
@@ -103,14 +99,10 @@ const getDashboardData = async (req, res) => {
         });
 
         data.students = allStudents;
-        data.notifications = notifications;
-        data.kpi = {
-          totalStudents: allStudents.length,
-          lowCreditStudents: lowCreditStudents.length,
-          totalCreditsInSystem: allStudents.reduce((total, student) => total + (student.credits || 0), 0),
-          creditsRemitted: allStudents.reduce((total, student) => total + (student.credits || 0), 0),
-          actionsToday: actionsToday
-        };
+        data.totalStudents = allStudents.length;
+        data.lowCreditStudentsCount = lowCreditStudents.length;
+        data.totalCreditsInSystem = allStudents.reduce((total, student) => total + (student.credits || 0), 0);
+        data.actionsToday = actionsToday;
         break;
 
       case 'admin':
@@ -142,7 +134,7 @@ const getDashboardData = async (req, res) => {
         data.kpi = {};
     }
 
-    res.status(200).json({ success: true, kpi: data });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     console.error('Dashboard error:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
