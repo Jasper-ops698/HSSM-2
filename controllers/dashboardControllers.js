@@ -106,20 +106,18 @@ const getDashboardData = async (req, res) => {
         break;
 
       case 'admin':
-        const [studentCount, teacherCount, classCount, enrollmentCount] = await Promise.all([
-          User.countDocuments({ role: 'student' }),
-          User.countDocuments({ role: 'teacher' }),
-          Class.countDocuments(),
-          Enrollment.countDocuments()
-        ]);
+        // Get counts first
+        const studentCount = await User.countDocuments({ role: 'student' });
+        const teacherCount = await User.countDocuments({ role: 'teacher' });
+        const classCount = await Class.countDocuments();
+        const enrollmentCount = await Enrollment.countDocuments();
+        const totalUsers = await User.countDocuments();
 
         // Fetch the actual data for admin dashboard
-        const [allStudents, allTeachers, allClasses, allEnrollments] = await Promise.all([
-          User.find({ role: 'student' }).select('name email department credits'),
-          User.find({ role: 'teacher' }).select('name email department'),
-          Class.find().populate('teacher', 'name'),
-          Enrollment.find().populate('student', 'name').populate('class', 'name')
-        ]);
+        const allStudents = await User.find({ role: 'student' }).select('name email department credits');
+        const allTeachers = await User.find({ role: 'teacher' }).select('name email department');
+        const allClasses = await Class.find().populate('teacher', 'name');
+        const allEnrollments = await Enrollment.find().populate('student', 'name').populate('class', 'name');
 
         data.students = allStudents;
         data.teachers = allTeachers;
@@ -129,7 +127,7 @@ const getDashboardData = async (req, res) => {
         data.teacherCount = teacherCount;
         data.classCount = classCount;
         data.enrollmentCount = enrollmentCount;
-        data.totalUsers = await User.countDocuments();
+        data.totalUsers = totalUsers;
         break;
 
       case 'HSSM-provider':
