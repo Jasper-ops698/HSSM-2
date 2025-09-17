@@ -3,7 +3,7 @@ const Timetable = require('../models/Timetable');
 const Class = require('../models/Class');
 const asyncHandler = require('express-async-handler');
 const NotificationService = require('../services/notificationService');
-const { io } = require('../src/server');
+const { getIO } = require('../src/socket');
 
 // @desc    Get all venues
 // @route   GET /api/venues
@@ -135,7 +135,7 @@ const assignVenue = asyncHandler(async (req, res) => {
       const populatedEntry = await Timetable.findById(timetableId).populate('venue teacher');
       
       // Emit a real-time event
-      io.emit('venue_updated', populatedEntry);
+      getIO().emit('venue_updated', populatedEntry);
 
       await NotificationService.notifyVenueUpdate(populatedEntry);
     } catch (error) {

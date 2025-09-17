@@ -20,7 +20,7 @@ const cron = require('node-cron');
 const Timetable = require('../models/Timetable');
 const Announcement = require('../models/Announcement');
 const http = require('http');
-const { Server } = require("socket.io");
+const { initSocket } = require("./socket");
 
 // Load environment variables from .env file
 dotenv.config();
@@ -226,22 +226,7 @@ connectToDatabase()
 
     // --- Socket.io Configuration ---
     const server = http.createServer(app);
-    const io = new Server(server, {
-      cors: {
-        origin: allowedOrigins,
-        methods: ["GET", "POST"]
-      }
-    });
-
-    io.on('connection', (socket) => {
-      console.log('a user connected');
-      socket.on('disconnect', () => {
-        console.log('user disconnected');
-      });
-    });
-
-    // Export io for use in other modules
-    module.exports.io = io;
+    const io = initSocket(server, allowedOrigins);
 
     // --- Start the Server ---
     const PORT = process.env.PORT || 5000;
