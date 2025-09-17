@@ -96,17 +96,23 @@ const getAllClasses = async (req, res) => {
     const user = req.user;
     let query = {};
 
-    // Filter classes based on user role and department
-    // Removed filtering for students to allow them to see all departments
-    if (user.role === 'teacher') {
+    // If the user is an HOD, they should only see classes in their department.
+    if (user.role === 'HOD') {
+      query.department = user.department;
+    } 
+    // Teachers also see classes in their department.
+    else if (user.role === 'teacher') {
       if (user.department) {
         query.department = user.department;
       }
     }
-    // HODs and admins can see all classes (no filtering)
+    // Admins can see all classes (no filter). Students can also see all classes.
 
-    const classes = await Class.find(query).populate('teacher', 'name email');
-    res.status(200).json({ success: true, data: classes });
+    const classes = await Class.find(query)
+      .populate('teacher', 'name email')
+      .populate('venue', 'name');
+      
+    res.status(200).json(classes);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
@@ -117,7 +123,7 @@ const getAllClasses = async (req, res) => {
 // @access  Private (Admin, HOD)
 const updateClass = async (req, res) => {
   try {
-    const { name, description, teacherId, department, creditsRequired } = req.body;
+    const { name, description, teacherId, department, creditsRequired, subject, dayOfWeek, startTime, endTime, venue } = req.body;
     const user = req.user;
     const classToUpdate = await Class.findById(req.params.id);
 
@@ -125,17 +131,17 @@ const updateClass = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found.' });
     }
 
-    // For HODs, ensure they can only update classes in their department
+    // HODs can only update classes in their own department
     if (user.role === 'HOD' && classToUpdate.department !== user.department) {
       return res.status(403).json({ success: false, message: 'You can only update classes in your department.' });
     }
 
-    // For HODs, ensure department changes are within their department
+    // Prevent HODs from changing the department of a class
     if (user.role === 'HOD' && department && department !== user.department) {
-      return res.status(403).json({ success: false, message: 'You can only assign classes to your department.' });
+      return res.status(403).json({ success: false, message: 'You cannot change the department of a class.' });
     }
 
-    // For HODs, ensure the teacher is from their department
+    // HODs can only assign teachers from their own department
     if (user.role === 'HOD' && teacherId) {
       const teacher = await User.findById(teacherId);
       if (!teacher || teacher.department !== user.department) {
@@ -143,6 +149,14 @@ const updateClass = async (req, res) => {
       }
     }
 
+    // Update fields
+    classToUpdate.subject = subject || classToUpdate.subject;
+    classToUpdate.dayOfWeek = dayOfWeek || classToUpdate.dayOfWeek;
+    classToUpdate.startTime = startTime || classToUpdate.startTime;
+    classToUpdate.endTime = endTime || classToUpdate.endTime;
+    classToUpdate.venue = venue || classToUpdate.venue;
+    
+    // Legacy fields (if still used)
     classToUpdate.name = name || classToUpdate.name;
     classToUpdate.description = description || classToUpdate.description;
     classToUpdate.department = department || classToUpdate.department;
@@ -152,7 +166,7 @@ const updateClass = async (req, res) => {
     }
 
     const updatedClass = await classToUpdate.save();
-    res.status(200).json({ success: true, data: updatedClass });
+    res.status(200).json(updatedClass);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
@@ -170,12 +184,13 @@ const deleteClass = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found.' });
     }
 
-    // For HODs, ensure they can only delete classes in their department
+    // HODs can only delete classes in their own department
     if (user.role === 'HOD' && classToDelete.department !== user.department) {
       return res.status(403).json({ success: false, message: 'You can only delete classes in your department.' });
     }
 
     await classToDelete.deleteOne();
+    
     res.status(200).json({ success: true, message: 'Class deleted successfully.' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });

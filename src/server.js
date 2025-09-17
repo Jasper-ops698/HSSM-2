@@ -98,6 +98,7 @@ connectToDatabase()
     const enrollmentRoutes = require("../routes/enrollmentRoutes");
     const classRoutes = require("../routes/classRoutes");
     const dashboardRoutes = require("../routes/dashboardRoutes");
+    const bookingRoutes = require('../routes/bookingRoutes');
     const adminRoutes = require("../routes/adminRoutes");
     const HssmRoutes = require("../routes/HssmRoutes");
     const chatRoutes = require('../routes/chatRoutes');
@@ -144,26 +145,9 @@ connectToDatabase()
     app.use("/api/enrollments", enrollmentRoutes);
     app.use("/api/classes", classRoutes);
     app.use("/api/dashboard", dashboardRoutes);
-    app.use("/api/admin", adminRoutes);
-    app.use("/api/hssm", HssmRoutes);
-    app.use('/api/chat', chatRoutes);
-    app.use('/api/2fa', twofaRoutes);
-    app.use('/api/auth/google', googleAuthRoutes);
-    app.use('/api/timetable', timetableRoutes);
-    app.use('/api/venues', venueRoutes);
-    app.use('/api/absence', absenceRoutes);
-    app.use('/api/notifications', notificationRoutes);
-    app.use('/api/student', studentRoutes);
-    app.use('/api/teacher', teacherRoutes);
-    app.use('/api/hod', hodRoutes);
-    app.use('/api/credit', creditRoutes);
-    app.use('/api/hssm-provider', hssmProviderRoutes);
-    app.use('/api/reports', reportRoutes);
-    app.use('/api/announcements', announcementRoutes);
-    app.use('/api/gemini', aiRoutes);
-    app.use('/api/hssm', hssmDashboardRoutes);
+    app.use('/api/bookings', bookingRoutes);
 
-    // --- Static File Serving ---
+    // Serve uploaded files statically
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
     // --- Default Route ---

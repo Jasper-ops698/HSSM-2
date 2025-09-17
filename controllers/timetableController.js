@@ -4,6 +4,25 @@ const Class = require('../models/Class');
 const xlsx = require('xlsx');
 const VENUES = require('../config/venues');
 const NotificationService = require('../services/notificationService');
+const Venue = require('../models/Venue');
+
+// Helper function to parse week ranges from sheet names (e.g., "Weeks 1-5" or "Week 6")
+function parseWeekRange(sheetName) {
+  const singleWeekMatch = sheetName.match(/Week (\d+)/i);
+  if (singleWeekMatch) {
+    const week = parseInt(singleWeekMatch[1], 10);
+    return { start: week, end: week };
+  }
+
+  const rangeMatch = sheetName.match(/Weeks (\d+)-(\d+)/i);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+    return { start, end };
+  }
+
+  return null; // Return null if the format is invalid
+}
 
 // Helper function to check for venue conflicts
 async function checkVenueConflict(venueId, day, startTime, endTime, term, week, excludeId = null) {
@@ -45,68 +64,91 @@ exports.uploadTimetable = async (req, res) => {
 
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const weeklySchedule = xlsx.utils.sheet_to_json(worksheet);
-
     const termStartDate = new Date(startDate);
     const termEndDate = new Date(endDate);
 
-    // Optional: Clear existing timetable for the term to prevent duplicates
+    // Clear existing timetable for the entire term to ensure a fresh start
     await Timetable.deleteMany({ department, term });
 
-    let currentWeekStart = new Date(termStartDate);
-    let weekNumber = 1;
+    let allSchedulesForClassGen = [];
+    const errors = [];
 
-    while (currentWeekStart < termEndDate) {
-      const currentWeekEnd = new Date(currentWeekStart);
-      currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
-
-      for (const row of weeklySchedule) {
-        const { subject, teacherEmail, dayOfWeek, startTime, endTime } = row;
-
-        if (!subject || !teacherEmail || !dayOfWeek || !startTime || !endTime) {
-          continue; // Skip incomplete rows
-        }
-
-        const teacher = await User.findOne({ email: teacherEmail });
-        if (!teacher) {
-          return res.status(400).json({ message: `Teacher with email ${teacherEmail} not found.` });
-        }
-
-        const newEntry = new Timetable({
-          subject,
-          teacher: teacher._id,
-          department,
-          dayOfWeek,
-          startTime,
-          endTime,
-          venue: null, // Venue is now optional
-          term,
-          week: weekNumber,
-          startDate: currentWeekStart,
-          endDate: currentWeekEnd,
-        });
-
-        await newEntry.save();
+    // Process each sheet in the Excel file
+    for (const sheetName of workbook.SheetNames) {
+      const weekRange = parseWeekRange(sheetName);
+      if (!weekRange) {
+        console.warn(`Skipping sheet with invalid name format: "${sheetName}"`);
+        continue;
       }
 
-      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-      weekNumber++;
+      const worksheet = workbook.Sheets[sheetName];
+      const weeklySchedule = xlsx.utils.sheet_to_json(worksheet);
+      
+      // Add unique entries to the list for class generation
+      weeklySchedule.forEach(row => {
+        if (!allSchedulesForClassGen.some(existing => existing.subject === row.subject && existing.teacherEmail === row.teacherEmail)) {
+          allSchedulesForClassGen.push(row);
+        }
+      });
+
+      // Apply this schedule to the specified week range
+      let currentWeekStart = new Date(termStartDate);
+      let weekNumber = 1;
+      while (currentWeekStart < termEndDate) {
+        if (weekNumber >= weekRange.start && weekNumber <= weekRange.end) {
+          const currentWeekEnd = new Date(currentWeekStart);
+          currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
+
+          for (const row of weeklySchedule) {
+            const { subject, teacherEmail, dayOfWeek, startTime, endTime } = row;
+            if (!subject || !teacherEmail || !dayOfWeek || !startTime || !endTime) {
+              continue; // Skip incomplete rows
+            }
+
+            const teacher = await User.findOne({ email: teacherEmail });
+            if (!teacher) {
+              const errorMsg = `Teacher with email ${teacherEmail} not found (from sheet "${sheetName}").`;
+              if (!errors.includes(errorMsg)) errors.push(errorMsg);
+              continue; // Skip this entry
+            }
+
+            const newEntry = new Timetable({
+              subject,
+              teacher: teacher._id,
+              department,
+              dayOfWeek,
+              startTime,
+              endTime,
+              venue: null, // Venue is optional
+              term,
+              week: weekNumber,
+              startDate: currentWeekStart,
+              endDate: currentWeekEnd,
+            });
+            await newEntry.save();
+          }
+        }
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        weekNumber++;
+      }
     }
 
-    // Auto-generate classes from the uploaded timetable (using the first week's data as representative)
-    const timetableDataForClassGen = weeklySchedule.map(row => ({ ...row, department }));
+    if (errors.length > 0) {
+      return res.status(400).json({ message: 'Failed to upload timetable due to errors.', errors });
+    }
+
+    // Auto-generate classes from the consolidated list of all unique timetable entries
+    const timetableDataForClassGen = allSchedulesForClassGen.map(row => ({ ...row, department }));
     try {
       const generatedClasses = await autoGenerateClassesFromTimetable(timetableDataForClassGen, department);
-      console.log(`Successfully auto-generated ${generatedClasses.length} classes`);
+      console.log(`Successfully auto-generated/updated ${generatedClasses.length} classes`);
     } catch (autoGenError) {
       console.error('Error during auto-generation:', autoGenError);
     }
 
     await NotificationService.notifyTimetableUpdate(department, req.user.name || req.user.email);
 
-    res.status(201).json({ message: `Timetable for term "${term}" uploaded and processed successfully for ${weekNumber - 1} weeks.` });
+    res.status(201).json({ message: `Timetable for term "${term}" uploaded and processed successfully.` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -129,14 +171,20 @@ async function autoGenerateClassesFromTimetable(timetableData, department) {
 
     for (const entry of timetableData) {
       if (!subjectsMap.has(entry.subject)) {
+        const teacher = await User.findOne({ email: entry.teacherEmail });
+        if (!teacher) {
+            console.warn(`Skipping class generation for subject "${entry.subject}" as teacher with email ${entry.teacherEmail} was not found.`);
+            continue;
+        }
         subjectsMap.set(entry.subject, {
           subject: entry.subject,
-          teacherEmail: entry.teacherEmail,
-          teacher: entry.teacher,
+          teacher: teacher._id,
           department: department,
           timetable: []
         });
       }
+      // This part might need adjustment if timetable structure in Class model is different
+      // For now, assuming it's a general representation
       subjectsMap.get(entry.subject).timetable.push({
         day: entry.dayOfWeek,
         startTime: entry.startTime,
@@ -147,10 +195,10 @@ async function autoGenerateClassesFromTimetable(timetableData, department) {
 
     const generatedClasses = [];
 
-    // Create classes for each subject
+    // Create or update classes for each subject
     for (const [subjectName, subjectData] of subjectsMap) {
       try {
-        // Calculate credits based on number of unique days
+        // Calculate credits based on number of unique days from the first week's schedule as a representative
         const creditsRequired = calculateCreditsFromTimetable(subjectData.timetable);
 
         // Check if class already exists
@@ -161,11 +209,12 @@ async function autoGenerateClassesFromTimetable(timetableData, department) {
         });
 
         if (existingClass) {
-          // Update existing class with new timetable
+          // Update existing class with new representative timetable and credits
           existingClass.timetable = subjectData.timetable;
           existingClass.creditsRequired = creditsRequired;
           await existingClass.save();
           console.log(`Updated existing class: ${subjectName}`);
+           generatedClasses.push(existingClass);
         } else {
           // Find HOD for the department
           const hod = await User.findOne({ role: 'HOD', department: department });
@@ -177,10 +226,10 @@ async function autoGenerateClassesFromTimetable(timetableData, department) {
             teacher: subjectData.teacher,
             department: department,
             creditsRequired: creditsRequired,
-            timetable: subjectData.timetable,
+            timetable: subjectData.timetable, // Representative timetable
             HOD: hod ? hod._id : null,
             enrolledStudents: [],
-            autoGenerated: true, // Mark as auto-generated
+            autoGenerated: true,
           });
 
           await newClass.save();
@@ -192,7 +241,7 @@ async function autoGenerateClassesFromTimetable(timetableData, department) {
       }
     }
 
-    console.log(`Auto-generated ${generatedClasses.length} classes from timetable`);
+    console.log(`Auto-generated/updated ${generatedClasses.length} classes from timetable`);
     return generatedClasses;
   } catch (error) {
     console.error('Error in auto-generating classes:', error);
@@ -222,12 +271,11 @@ exports.getStudentTimetable = async (req, res) => {
 
     // Find classes the student is enrolled in
     const enrolledClasses = await Class.find({
-      students: studentId,
-      status: 'Approved'
-    }).select('name subject');
+      enrolledStudents: studentId,
+    }).select('name');
 
     // Get subjects from enrolled classes
-    const enrolledSubjects = enrolledClasses.map(cls => cls.subject || cls.name);
+    const enrolledSubjects = enrolledClasses.map(cls => cls.name);
 
     // Find timetable entries for these subjects, department, and week
     const timetable = await Timetable.find({
@@ -238,10 +286,11 @@ exports.getStudentTimetable = async (req, res) => {
 
     // Group by day for better display
     const groupedTimetable = timetable.reduce((acc, entry) => {
-      if (!acc[entry.dayOfWeek]) {
-        acc[entry.dayOfWeek] = [];
+      const day = entry.dayOfWeek;
+      if (!acc[day]) {
+        acc[day] = [];
       }
-      acc[entry.dayOfWeek].push(entry);
+      acc[day].push(entry);
       return acc;
     }, {});
 
@@ -281,10 +330,11 @@ exports.getTeacherTimetable = async (req, res) => {
 
     // Group by day for better display
     const groupedTimetable = timetable.reduce((acc, entry) => {
-      if (!acc[entry.dayOfWeek]) {
-        acc[entry.dayOfWeek] = [];
+      const day = entry.dayOfWeek;
+      if (!acc[day]) {
+        acc[day] = [];
       }
-      acc[entry.dayOfWeek].push(entry);
+      acc[day].push(entry);
       return acc;
     }, {});
 
@@ -312,25 +362,25 @@ exports.getTodayTimetable = async (req, res) => {
     const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
 
     // Find the current week number based on today's date
-    const currentTimetableEntry = await Timetable.findOne({
-      department: studentDepartment,
-      startDate: { $lte: today },
-      endDate: { $gte: today }
+    // This logic assumes term start/end dates are stored somewhere accessible
+    // For this implementation, we find any timetable entry to determine the week
+    const anyTimetableEntry = await Timetable.findOne({
+        department: studentDepartment,
+        startDate: { $lte: today },
+        endDate: { $gte: today }
     });
 
-    if (!currentTimetableEntry) {
-      return res.json([]); // No classes scheduled for today
+    if (!anyTimetableEntry) {
+      return res.json([]); // No classes scheduled for today or term not found
     }
-    const currentWeek = currentTimetableEntry.week;
+    const currentWeek = anyTimetableEntry.week;
 
     // Find classes the student is enrolled in
     const enrolledClasses = await Class.find({
-      students: studentId,
-      status: 'Approved'
-    }).select('name subject');
+      enrolledStudents: studentId,
+    }).select('name');
 
-    // Get subjects from enrolled classes
-    const enrolledSubjects = enrolledClasses.map(cls => cls.subject || cls.name);
+    const enrolledSubjects = enrolledClasses.map(cls => cls.name);
 
     // Find today's timetable entries for the current week
     const todayTimetable = await Timetable.find({
@@ -367,84 +417,84 @@ exports.previewTimetable = async (req, res) => {
 
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet);
-
     const previewData = [];
     const errors = [];
     const warnings = [];
+    let totalRows = 0;
 
-    for (let index = 0; index < data.length; index++) {
-      const row = data[index];
-      const { subject, teacherEmail, dayOfWeek, startTime, endTime, venue } = row;
-
-      const rowData = {
-        rowNumber: index + 2, // Excel rows start at 1, plus header
-        subject,
-        teacherEmail,
-        dayOfWeek,
-        startTime,
-        endTime,
-        venue,
-        status: 'valid',
-        errors: [],
-        warnings: []
-      };
-
-      // Basic validation for required fields
-      if (!subject) rowData.errors.push('Subject is required');
-      if (!teacherEmail) rowData.errors.push('Teacher email is required');
-      if (!dayOfWeek) rowData.errors.push('Day of week is required');
-      if (!startTime) rowData.errors.push('Start time is required');
-      if (!endTime) rowData.errors.push('End time is required');
-      if (!venue) rowData.errors.push('Venue is required');
-
-      if (rowData.errors.length > 0) {
-        rowData.status = 'error';
-      } else {
-        // Advanced validation
-        if (!VENUES.includes(venue)) {
-          rowData.errors.push(`Invalid venue: ${venue}.`);
-          rowData.status = 'error';
+    for (const sheetName of workbook.SheetNames) {
+        const weekRange = parseWeekRange(sheetName);
+        if (!weekRange) {
+            warnings.push(`Sheet "${sheetName}" has an invalid name format and will be skipped.`);
+            continue;
         }
 
-        const teacher = await User.findOne({ email: teacherEmail });
-        if (!teacher) {
-          rowData.errors.push(`Teacher with email ${teacherEmail} not found.`);
-          rowData.status = 'error';
-        } else {
-          rowData.teacherName = teacher.name;
-        }
+        const worksheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(worksheet);
+        totalRows += data.length;
 
-        // Simulate conflict check for the first week of the term
-        try {
-          await checkVenueConflict(venue, dayOfWeek, startTime, endTime, term, 1);
-        } catch (conflictError) {
-          rowData.warnings.push(conflictError.message); // Treat as a warning in preview
-        }
-      }
+        for (let index = 0; index < data.length; index++) {
+            const row = data[index];
+            const { subject, teacherEmail, dayOfWeek, startTime, endTime, venue } = row;
 
-      previewData.push(rowData);
-      if (rowData.errors.length > 0) {
-        errors.push(...rowData.errors.map(e => `Row ${rowData.rowNumber}: ${e}`));
-      }
-      if (rowData.warnings.length > 0) {
-        warnings.push(...rowData.warnings.map(w => `Row ${rowData.rowNumber}: ${w}`));
-      }
+            const rowData = {
+                sheetName,
+                weekRange: `Weeks ${weekRange.start}-${weekRange.end}`,
+                rowNumber: index + 2,
+                subject,
+                teacherEmail,
+                dayOfWeek,
+                startTime,
+                endTime,
+                venue,
+                status: 'valid',
+                errors: [],
+                warnings: []
+            };
+
+            if (!subject) rowData.errors.push('Subject is required');
+            if (!teacherEmail) rowData.errors.push('Teacher email is required');
+            if (!dayOfWeek) rowData.errors.push('Day of week is required');
+            if (!startTime) rowData.errors.push('Start time is required');
+            if (!endTime) rowData.errors.push('End time is required');
+            if (!venue) rowData.warnings.push('Venue is missing and will need to be assigned later.');
+
+            if (rowData.errors.length > 0) {
+                rowData.status = 'error';
+            } else {
+                const teacher = await User.findOne({ email: teacherEmail });
+                if (!teacher) {
+                    rowData.errors.push(`Teacher with email ${teacherEmail} not found.`);
+                    rowData.status = 'error';
+                } else {
+                    rowData.teacherName = teacher.name;
+                }
+
+                if (venue) {
+                    const venueExists = await Venue.findOne({ name: venue });
+                    if (!venueExists) {
+                        rowData.warnings.push(`Venue "${venue}" does not exist. It can be assigned later.`);
+                    }
+                }
+            }
+            previewData.push(rowData);
+        }
     }
+    
+    const finalErrors = previewData.filter(r => r.errors.length > 0).map(r => `Sheet "${r.sheetName}", Row ${r.rowNumber}: ${r.errors.join(', ')}`);
+    const finalWarnings = previewData.filter(r => r.warnings.length > 0).map(r => `Sheet "${r.sheetName}", Row ${r.rowNumber}: ${r.warnings.join(', ')}`);
 
     res.json({
       success: true,
       data: previewData,
       summary: {
-        totalRows: data.length,
+        totalRows,
         validRows: previewData.filter(r => r.status === 'valid').length,
-        errorRows: previewData.filter(r => r.status === 'error').length,
-        warningRows: previewData.filter(r => r.warnings.length > 0).length,
+        errorRows: finalErrors.length,
+        warningRows: finalWarnings.length,
       },
-      errors,
-      warnings
+      errors: finalErrors,
+      warnings: finalWarnings
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
