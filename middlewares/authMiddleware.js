@@ -42,11 +42,26 @@ exports.protect = async (req, res, next) => {
       // Catch-all error for invalid or failed token verification
       return res.status(401).json({ message: 'Not authorized, token failed' });
     }
+// Middleware to check if user is admin
+exports.admin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
   } else {
-    return res.status(401).json({ message: 'Not authorized, no token' });
+    res.status(403).json({ message: 'Access denied. Admin role required.' });
+  }
+};
+
+// Middleware to check if user is teacher
+exports.teacher = (req, res, next) => {
+  if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin')) {
+    next();
+  } else {
+    res.status(403).json({ message: 'Access denied. Teacher role required.' });
   }
 };
 
 module.exports = {
   protect: exports.protect,
+  admin: exports.admin,
+  teacher: exports.teacher,
 };

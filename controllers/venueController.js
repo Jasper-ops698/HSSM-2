@@ -16,24 +16,10 @@ const getVenues = asyncHandler(async (req, res) => {
 // @desc    Create a venue
 // @route   POST /api/venues
 // @access  Private/Admin
-const createVenue = asyncHandler(async (req, res) => {
-  const { name, capacity } = req.body;
-
-  const venueExists = await Venue.findOne({ name });
-
-  if (venueExists) {
-    res.status(400);
-    throw new Error('Venue already exists');
-  }
-
-  const venue = new Venue({
-    name,
-    capacity,
-  });
-
-  const createdVenue = await venue.save();
-  res.status(201).json(createdVenue);
-});
+const createVenue = (req, res) => {
+  // your logic
+  res.send("Venue created!");
+};
 
 // @desc    Update a venue
 // @route   PUT /api/venues/:id
