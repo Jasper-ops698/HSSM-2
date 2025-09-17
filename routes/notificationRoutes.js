@@ -13,4 +13,9 @@ router.get('/', protect, getNotifications);
 // @access  Private
 router.put('/mark-read', protect, markNotificationsAsRead);
 
+// @route   PUT /api/notifications/mark-all-read
+// @desc    Mark all notifications as read
+// @access  Private
+router.put('/mark-all-read', protect, markNotificationsAsRead);
+
 module.exports = router;

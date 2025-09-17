@@ -18,32 +18,37 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// @route   POST /api/absence
+// @route   POST /api/absences
 // @desc    Create absence (for both students and teachers)
 // @access  Private
 router.post('/', protect, upload.single('evidence'), absenceController.createAbsence);
 
-// @route   POST /api/absence/report
+// @route   POST /api/absences/report
 // @desc    Report absence (for teachers)
 // @access  Private/Teacher
 router.post('/report', protect, verifyRole(['teacher']), absenceController.reportAbsence);
 
-// @route   GET /api/absence
+// @route   GET /api/absences
 // @desc    Get absences for HOD's department
 // @access  Private/HOD
 router.get('/', protect, verifyRole(['HOD']), absenceController.getAbsences);
 
-// @route   GET /api/absence/teacher
+// @route   GET /api/absences/teacher
 // @desc    Get absences for current teacher
 // @access  Private/Teacher
 router.get('/teacher', protect, verifyRole(['teacher']), absenceController.getTeacherAbsences);
 
-// @route   POST /api/absence/respond
+// @route   POST /api/absences/student
+// @desc    Create student absence
+// @access  Private/Student
+router.post('/student', protect, verifyRole(['student']), upload.single('evidence'), absenceController.createAbsence);
+
+// @route   POST /api/absences/respond
 // @desc    Respond to absence request (HOD)
 // @access  Private/HOD
 router.post('/respond', protect, verifyRole(['HOD']), absenceController.respondToAbsence);
 
-// @route   POST /api/absence/assign-replacement
+// @route   POST /api/absences/assign-replacement
 // @desc    Assign replacement teacher
 // @access  Private/HOD
 router.post('/assign-replacement', protect, verifyRole(['HOD']), absenceController.assignReplacement);

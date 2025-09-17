@@ -117,6 +117,7 @@ connectToDatabase()
     const hssmDashboardRoutes = require('../routes/hssmDashboardRoutes');
     const timetableRoutes = require('../routes/timetableRoutes');
     const venueRoutes = require('../routes/venueRoutes');
+    const serviceRoutes = require('../routes/serviceRoutes');
 
     // CORS test endpoint
     app.get('/api/test-cors', (req, res) => {
@@ -163,6 +164,7 @@ connectToDatabase()
     app.use('/api/teachers', teacherRoutes);
     app.use('/api/timetables', timetableRoutes);
     app.use('/api/twofa', twofaRoutes);
+    app.use('/api/services', serviceRoutes);
 
     // Serve uploaded files statically
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
