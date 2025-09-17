@@ -42,6 +42,11 @@ exports.protect = async (req, res, next) => {
       // Catch-all error for invalid or failed token verification
       return res.status(401).json({ message: 'Not authorized, token failed' });
     }
+  } else {
+    return res.status(401).json({ message: 'Not authorized, no token' });
+  }
+};
+
 // Middleware to check if user is admin
 exports.admin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
