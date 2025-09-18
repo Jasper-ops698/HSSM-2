@@ -91,7 +91,7 @@ const createAnnouncement = async (req, res) => {
         sender: hod._id,
         type: 'new_announcement',
         message: `New announcement in ${hod.department}: ${title}`,
-        related_announcement: announcement._id,
+        data: { announcementId: announcement._id },
       }));
       await Notification.insertMany(notifications);
     }

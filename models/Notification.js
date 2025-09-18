@@ -21,7 +21,8 @@ const notificationSchema = new mongoose.Schema({
     'incident',
     'overdue_task',
     'asset_maintenance',
-    'meter_reading'
+    'meter_reading',
+    'new_announcement'
   ], required: true },
   title: String,
   message: String,
