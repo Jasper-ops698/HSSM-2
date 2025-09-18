@@ -13,10 +13,10 @@ const timetableSchema = new mongoose.Schema({
     ref: 'Venue',
     required: false 
   },
-  term: { type: String, required: true },
-  week: { type: Number, required: true },
-  startDate: { type: Date, required: true },
-  endDate: { type: Date, required: true },
+  term: { type: String, required: false },
+  week: { type: Number, required: false },
+  startDate: { type: Date, required: false },
+  endDate: { type: Date, required: false },
   reminderSent: { type: Boolean, default: false },
 }, { timestamps: true });
 
