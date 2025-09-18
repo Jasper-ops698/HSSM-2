@@ -47,6 +47,45 @@ async function checkVenueConflict(venueId, day, startTime, endTime, term, week, 
   }
 }
 
+exports.previewTimetable = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded.' });
+  }
+
+  try {
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+    const preview = {};
+    const errors = [];
+    const warnings = [];
+
+    for (const sheetName of workbook.SheetNames) {
+      const weekRange = parseWeekRange(sheetName);
+      if (!weekRange) {
+        warnings.push(`Skipping sheet with invalid name format: "${sheetName}"`);
+        continue;
+      }
+
+      const worksheet = workbook.Sheets[sheetName];
+      const schedule = xlsx.utils.sheet_to_json(worksheet);
+      
+      preview[sheetName] = {
+        weekRange,
+        schedule,
+        rowCount: schedule.length,
+      };
+    }
+
+    if (Object.keys(preview).length === 0) {
+      errors.push('No valid sheets found in the uploaded file.');
+    }
+
+    res.status(200).json({ preview, errors, warnings });
+  } catch (error) {
+    console.error('Error previewing timetable:', error);
+    res.status(500).json({ message: 'Failed to preview timetable.', error: error.message });
+  }
+};
+
 exports.uploadTimetable = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
@@ -397,53 +436,4 @@ exports.getTodayTimetable = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch today\'s timetable.' });
   }
-};
-
-// Preview timetable data from Excel file without saving
-exports.previewTimetable = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded.' });
-  }
-
-  try {
-    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const preview = {};
-    const errors = [];
-    const warnings = [];
-
-    for (const sheetName of workbook.SheetNames) {
-      const weekRange = parseWeekRange(sheetName);
-      if (!weekRange) {
-        warnings.push(`Skipping sheet with invalid name format: "${sheetName}"`);
-        continue;
-      }
-
-      const worksheet = workbook.Sheets[sheetName];
-      const schedule = xlsx.utils.sheet_to_json(worksheet);
-      
-      preview[sheetName] = {
-        weekRange,
-        schedule,
-        rowCount: schedule.length,
-      };
-    }
-
-    if (Object.keys(preview).length === 0) {
-      errors.push('No valid sheets found in the uploaded file.');
-    }
-
-    res.status(200).json({ preview, errors, warnings });
-  } catch (error) {
-    console.error('Error previewing timetable:', error);
-    res.status(500).json({ message: 'Failed to preview timetable.', error: error.message });
-  }
-};
-
-module.exports = {
-  uploadTimetable: exports.uploadTimetable,
-  getTimetable: exports.getTimetable,
-  getStudentTimetable: exports.getStudentTimetable,
-  getTeacherTimetable: exports.getTeacherTimetable,
-  getTodayTimetable: exports.getTodayTimetable,
-  previewTimetable: exports.previewTimetable,
 };
