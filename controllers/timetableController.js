@@ -405,99 +405,37 @@ exports.previewTimetable = async (req, res) => {
     return res.status(400).json({ message: 'No file uploaded.' });
   }
 
-  const { term } = req.body;
-  if (!term) {
-    return res.status(400).json({ message: 'Term is required for preview.' });
-  }
-
-  const department = req.user.department;
-  if (!department) {
-    return res.status(400).json({ message: 'User department not found.' });
-  }
-
   try {
     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const previewData = [];
+    const preview = {};
     const errors = [];
     const warnings = [];
-    let totalRows = 0;
 
     for (const sheetName of workbook.SheetNames) {
-        const weekRange = parseWeekRange(sheetName);
-        if (!weekRange) {
-            warnings.push(`Sheet "${sheetName}" has an invalid name format and will be skipped.`);
-            continue;
-        }
+      const weekRange = parseWeekRange(sheetName);
+      if (!weekRange) {
+        warnings.push(`Skipping sheet with invalid name format: "${sheetName}"`);
+        continue;
+      }
 
-        const worksheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(worksheet);
-        totalRows += data.length;
-
-        for (let index = 0; index < data.length; index++) {
-            const row = data[index];
-            const { subject, teacherEmail, dayOfWeek, startTime, endTime, venue } = row;
-
-            const rowData = {
-                sheetName,
-                weekRange: `Weeks ${weekRange.start}-${weekRange.end}`,
-                rowNumber: index + 2,
-                subject,
-                teacherEmail,
-                dayOfWeek,
-                startTime,
-                endTime,
-                venue,
-                status: 'valid',
-                errors: [],
-                warnings: []
-            };
-
-            if (!subject) rowData.errors.push('Subject is required');
-            if (!teacherEmail) rowData.errors.push('Teacher email is required');
-            if (!dayOfWeek) rowData.errors.push('Day of week is required');
-            if (!startTime) rowData.errors.push('Start time is required');
-            if (!endTime) rowData.errors.push('End time is required');
-            if (!venue) rowData.warnings.push('Venue is missing and will need to be assigned later.');
-
-            if (rowData.errors.length > 0) {
-                rowData.status = 'error';
-            } else {
-                const teacher = await User.findOne({ email: teacherEmail });
-                if (!teacher) {
-                    rowData.errors.push(`Teacher with email ${teacherEmail} not found.`);
-                    rowData.status = 'error';
-                } else {
-                    rowData.teacherName = teacher.name;
-                }
-
-                if (venue) {
-                    const venueExists = await Venue.findOne({ name: venue });
-                    if (!venueExists) {
-                        rowData.warnings.push(`Venue "${venue}" does not exist. It can be assigned later.`);
-                    }
-                }
-            }
-            previewData.push(rowData);
-        }
+      const worksheet = workbook.Sheets[sheetName];
+      const schedule = xlsx.utils.sheet_to_json(worksheet);
+      
+      preview[sheetName] = {
+        weekRange,
+        schedule,
+        rowCount: schedule.length,
+      };
     }
-    
-    const finalErrors = previewData.filter(r => r.errors.length > 0).map(r => `Sheet "${r.sheetName}", Row ${r.rowNumber}: ${r.errors.join(', ')}`);
-    const finalWarnings = previewData.filter(r => r.warnings.length > 0).map(r => `Sheet "${r.sheetName}", Row ${r.rowNumber}: ${r.warnings.join(', ')}`);
 
-    res.json({
-      success: true,
-      data: previewData,
-      summary: {
-        totalRows,
-        validRows: previewData.filter(r => r.status === 'valid').length,
-        errorRows: finalErrors.length,
-        warningRows: finalWarnings.length,
-      },
-      errors: finalErrors,
-      warnings: finalWarnings
-    });
+    if (Object.keys(preview).length === 0) {
+      errors.push('No valid sheets found in the uploaded file.');
+    }
+
+    res.status(200).json({ preview, errors, warnings });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error previewing timetable:', error);
+    res.status(500).json({ message: 'Failed to preview timetable.', error: error.message });
   }
 };
 

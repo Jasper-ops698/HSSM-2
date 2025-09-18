@@ -61,15 +61,20 @@ const getDashboardData = async (req, res) => {
 // @access  Private/HOD
 const createAnnouncement = async (req, res) => {
   try {
-    const { title, message, targetRoles } = req.body;
+    const { title, message, targetRoles: rawTargetRoles } = req.body;
     const hod = req.user;
+
+    // Ensure targetRoles is an array, providing a default if it's missing or empty
+    const targetRoles = (Array.isArray(rawTargetRoles) && rawTargetRoles.length > 0)
+      ? rawTargetRoles
+      : ['student', 'teacher'];
 
     const announcement = new Announcement({
       title,
       message,
       department: hod.department,
       createdBy: hod._id,
-      targetRoles: targetRoles || ['student', 'teacher'], // Default to students and teachers
+      targetRoles,
     });
 
     await announcement.save();
@@ -80,15 +85,14 @@ const createAnnouncement = async (req, res) => {
       role: { $in: targetRoles },
     });
 
-    const notifications = usersToNotify.map(user => ({
-      recipient: user._id,
-      sender: hod._id,
-      type: 'new_announcement',
-      message: `New announcement in ${hod.department}: ${title}`,
-      related_announcement: announcement._id,
-    }));
-
-    if (notifications.length > 0) {
+    if (usersToNotify.length > 0) {
+      const notifications = usersToNotify.map(user => ({
+        recipient: user._id,
+        sender: hod._id,
+        type: 'new_announcement',
+        message: `New announcement in ${hod.department}: ${title}`,
+        related_announcement: announcement._id,
+      }));
       await Notification.insertMany(notifications);
     }
 
