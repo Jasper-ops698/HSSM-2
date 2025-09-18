@@ -115,9 +115,12 @@ exports.uploadTimetable = async (req, res) => {
   }
 
   const { term, startDate, endDate } = req.body;
-  if (!term || !startDate || !endDate) {
-    return res.status(400).json({ message: 'Term, start date, and end date are required.' });
-  }
+// Remove strict requirement for term, startDate, and endDate
+// If provided, use them; if not, proceed with defaults or handle accordingly
+// Example: Only warn if missing, but do not return error
+if (!term || !startDate || !endDate) {
+  console.warn('Warning: Term, start date, or end date not provided. Proceeding with defaults or skipping related logic.');
+}
 
   const department = req.user.department;
   if (!department) {
