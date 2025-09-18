@@ -275,6 +275,6 @@ module.exports = {
   updateAnnouncement: exports.updateAnnouncement,
   deleteAnnouncement: exports.deleteAnnouncement,
   toggleAnnouncementStatus: exports.toggleAnnouncementStatus,
-  markAllAsRead: exports.markAllAsRead,
+  markAllAsRead: exports.markAllAnnouncementsAsRead,
   getMyAnnouncements: exports.getMyAnnouncements,
 };

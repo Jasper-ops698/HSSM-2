@@ -66,7 +66,7 @@ router.delete(
 // @route   PUT /api/announcements/mark-all-read
 // @desc    Mark all announcements as read for the current user
 // @access  Private
-router.put('/mark-all-read', protect, markAllAnnouncementsAsRead);
+router.put('/mark-all-read', protect, markAllAsRead);
 
 // @route   GET /api/announcements/my-announcements
 // @desc    Get all announcements created by the logged-in user
