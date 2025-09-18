@@ -119,7 +119,7 @@ exports.uploadTimetable = async (req, res) => {
 // If provided, use them; if not, proceed with defaults or handle accordingly
 // Example: Only warn if missing, but do not return error
 if (!term || !startDate || !endDate) {
-  console.warn('Warning: Term, start date, or end date not provided. Proceeding with defaults or skipping related logic.');
+  console.warn('Warning: Term, start date, or end date not provided.');
 }
 
   const department = req.user.department;

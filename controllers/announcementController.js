@@ -250,22 +250,19 @@ exports.getMyAnnouncements = async (req, res) => {
 // @desc    Mark all announcements as read for the current user
 // @route   PUT /api/announcements/mark-all-read
 // @access  Private
-// This is a placeholder, actual implementation would depend on how "read" status is tracked.
-// For now, it just returns a success message.
 exports.markAllAnnouncementsAsRead = async (req, res) => {
-    try {
-        // This is a simplified implementation. In a real-world scenario,
-        // you would have a separate model to track which user has read which announcement.
-        // For example, a `UserAnnouncementStatus` collection.
-        
-        // For now, we'll just log the action and return success.
-        console.log(`User ${req.user._id} marked all announcements as read.`);
-        
-        res.status(200).json({ message: 'All announcements marked as read' });
-    } catch (error) {
-        console.error('Error marking announcements as read:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+  try {
+    const userId = req.user._id;
+    // Update all announcements that the user hasn't read yet
+    await Announcement.updateMany(
+      { readBy: { $ne: userId } },
+      { $addToSet: { readBy: userId } }
+    );
+    res.status(200).json({ message: 'All announcements marked as read' });
+  } catch (error) {
+    console.error('Error marking announcements as read:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
 module.exports = {

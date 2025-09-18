@@ -15,7 +15,7 @@ const timetableSchema = new mongoose.Schema({
   },
   term: { type: String, required: false },
   week: { type: Number, required: false },
-  startDate: { type: Date, required: false },
+  startDate: { type: Date, required: true },
   endDate: { type: Date, required: false },
   reminderSent: { type: Boolean, default: false },
 }, { timestamps: true });
