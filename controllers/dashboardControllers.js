@@ -48,10 +48,12 @@ const getDashboardData = async (req, res) => {
           },
         });
         data.enrollments = enrollments;
-        data.enrolledClassesCount = enrollments.length;
-        data.credits = student.credits || 0;
-        data.pendingEnrollmentsCount = enrollments.filter(e => e.status === 'Pending').length;
-        data.approvedEnrollmentsCount = enrollments.filter(e => e.status === 'Approved').length;
+        data.kpi = {
+          credits: student.credits || 0,
+          enrolledClasses: enrollments.length,
+          pendingEnrollments: enrollments.filter(e => e.status === 'Pending').length,
+          approvedEnrollments: enrollments.filter(e => e.status === 'Approved').length,
+        };
         break;
 
       case 'teacher':

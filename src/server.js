@@ -148,7 +148,7 @@ connectToDatabase()
     app.use("/api/dashboard", dashboardRoutes);
     app.use('/api/bookings', bookingRoutes);
     app.use('/api/venues', venueRoutes);
-    app.use('/api/absence', absenceRoutes);
+    app.use('/api/absences', absenceRoutes);
     app.use('/api/admin', adminRoutes);
     app.use('/api/ai', aiRoutes);
     app.use('/api/announcements', announcementRoutes);

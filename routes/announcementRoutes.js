@@ -6,7 +6,9 @@ const {
   getAnnouncementById, 
   updateAnnouncement, 
   deleteAnnouncement,
-  toggleAnnouncementStatus
+  toggleAnnouncementStatus,
+  markAllAsRead,
+  getMyAnnouncements
 } = require('../controllers/announcementController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
@@ -60,5 +62,15 @@ router.delete(
   verifyRole(['admin', 'HOD', 'teacher']), 
   deleteAnnouncement
 );
+
+// @route   PUT /api/announcements/mark-all-read
+// @desc    Mark all announcements as read for the current user
+// @access  Private
+router.put('/mark-all-read', protect, markAllAnnouncementsAsRead);
+
+// @route   GET /api/announcements/my-announcements
+// @desc    Get all announcements created by the logged-in user
+// @access  Private (HOD, Teacher)
+router.get('/my-announcements', protect, verifyRole(['HOD', 'teacher']), getMyAnnouncements);
 
 module.exports = router;

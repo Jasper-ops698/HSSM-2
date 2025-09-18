@@ -40,7 +40,11 @@ const announcementSchema = new mongoose.Schema({
   },
   endDate: {
     type: Date
-  }
+  },
+  readBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Announcement', announcementSchema);
