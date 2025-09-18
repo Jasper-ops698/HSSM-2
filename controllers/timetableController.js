@@ -79,7 +79,30 @@ exports.previewTimetable = async (req, res) => {
       errors.push('No valid sheets found in the uploaded file.');
     }
 
-    res.status(200).json({ preview, errors, warnings });
+    // Calculate summary statistics
+    let totalRows = 0;
+    let validRows = 0;
+    let errorRows = 0;
+    let warningRows = 0;
+
+    Object.values(preview).forEach(sheet => {
+      totalRows += sheet.rowCount;
+      // For now, assume all rows are valid if no specific validation is done
+      validRows += sheet.rowCount;
+    });
+
+    // Add error and warning counts based on arrays
+    errorRows = errors.length;
+    warningRows = warnings.length;
+
+    const summary = {
+      totalRows,
+      validRows,
+      errorRows,
+      warningRows
+    };
+
+    res.status(200).json({ preview, errors, warnings, summary });
   } catch (error) {
     console.error('Error previewing timetable:', error);
     res.status(500).json({ message: 'Failed to preview timetable.', error: error.message });
