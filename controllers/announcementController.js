@@ -252,7 +252,7 @@ exports.getMyAnnouncements = async (req, res) => {
 // @access  Private
 // This is a placeholder, actual implementation would depend on how "read" status is tracked.
 // For now, it just returns a success message.
-exports.markAllAsRead = async (req, res) => {
+exports.markAllAnnouncementsAsRead = async (req, res) => {
     try {
         // This is a simplified implementation. In a real-world scenario,
         // you would have a separate model to track which user has read which announcement.
@@ -275,6 +275,6 @@ module.exports = {
   updateAnnouncement: exports.updateAnnouncement,
   deleteAnnouncement: exports.deleteAnnouncement,
   toggleAnnouncementStatus: exports.toggleAnnouncementStatus,
-  markAllAnnouncementsAsRead: exports.markAllAnnouncementsAsRead,
+  markAllAsRead: exports.markAllAsRead,
   getMyAnnouncements: exports.getMyAnnouncements,
 };
