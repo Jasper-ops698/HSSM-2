@@ -162,7 +162,7 @@ connectToDatabase()
     app.use('/api/reports', reportRoutes);
     app.use('/api/student', studentRoutes);
     app.use('/api/teacher', teacherRoutes);
-    app.use('/api/timetables', timetableRoutes);
+    app.use('/api/timetable', timetableRoutes);
     app.use('/api/twofa', twofaRoutes);
     app.use('/api/services', serviceRoutes);
 
