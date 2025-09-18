@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const timetableController = require('../controllers/timetableController');
-const { protect, admin } = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
+const verifyRole = require('../middlewares/verifyRole');
 const multer = require('multer');
 
 // Setup multer for file uploads
@@ -11,12 +12,12 @@ const upload = multer({ storage: storage });
 // @route   POST /api/timetable/preview
 // @desc    Preview timetable data from Excel file without saving
 // @access  Private/HOD
-router.post('/preview', protect, upload.single('timetable'), timetableController.previewTimetable);
+router.post('/preview', protect, verifyRole(['HOD']), upload.single('timetable'), timetableController.previewTimetable);
 
 // @route   POST /api/timetable/upload
 // @desc    Upload and process timetable from Excel file
 // @access  Private/HOD
-router.post('/upload', protect, upload.single('timetable'), timetableController.uploadTimetable);
+router.post('/upload', protect, verifyRole(['HOD']), upload.single('timetable'), timetableController.uploadTimetable);
 
 // @route   GET /api/timetable
 // @desc    Get all timetable entries

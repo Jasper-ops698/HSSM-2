@@ -6,34 +6,57 @@ const Announcement = require('../models/Announcement');
 // Report absence
 exports.reportAbsence = async (req, res) => {
   try {
-    const { classId, dateOfAbsence, reason } = req.body;
-    const teacherId = req.user._id;
+    const { role, class: classId, reason, date, duration } = req.body;
+    const userId = req.user._id;
     const department = req.user.department;
 
-    const absence = new Absence({
-      teacher: teacherId,
-      class: classId,
-      department,
-      dateOfAbsence,
+    const absenceData = {
       reason,
-    });
+      dateOfAbsence: date,
+      duration,
+      department,
+      status: 'Pending',
+    };
 
+    if (role === 'teacher') {
+      absenceData.teacher = userId;
+      if (classId) {
+        absenceData.class = classId;
+      }
+    } else if (role === 'student') {
+      absenceData.student = userId;
+      if (classId) {
+        absenceData.class = classId;
+      }
+    } else {
+      return res.status(400).json({ message: 'Invalid role specified.' });
+    }
+
+    if (req.file) {
+      absenceData.evidence = req.file.path;
+    }
+
+    const absence = new Absence(absenceData);
     await absence.save();
 
-    // Notify HOD
-    const hod = await User.findOne({ department, role: 'hod' });
-    if (hod) {
-      await Announcement.create({
-        title: 'Teacher Absence Reported',
-        content: `Teacher ${req.user.name} has reported absence for class on ${dateOfAbsence}. Reason: ${reason}`,
-        department,
-        createdBy: req.user._id,
-      });
+    // Notify HOD if a teacher is absent
+    if (role === 'teacher') {
+      const hod = await User.findOne({ department, role: 'HOD' });
+      if (hod) {
+        await Announcement.create({
+          title: 'Teacher Absence Reported',
+          message: `Teacher ${req.user.name} has reported absence from ${date} for ${duration} days. Reason: ${reason}`,
+          department,
+          targetRoles: ['HOD'],
+          createdBy: req.user._id,
+        });
+      }
     }
 
     res.status(201).json({ message: 'Absence reported successfully.' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error reporting absence:", error);
+    res.status(500).json({ message: 'Failed to report absence.', error: error.message });
   }
 };
 

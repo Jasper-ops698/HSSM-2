@@ -2,6 +2,8 @@ const Class = require('../models/Class');
 const Absence = require('../models/Absence');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const Announcement = require('../models/Announcement');
+const Announcement = require('../models/Announcement');
 
 // @desc    Teacher creates a new class
 // @route   POST /api/teacher/class
@@ -333,9 +335,9 @@ exports.getVenueAnnouncements = async (req, res) => {
   }
 };
 
-// @desc    Get all students (for teachers to send announcements)
+// @desc    Get all students in the teacher's department
 // @route   GET /api/teacher/students
-// @access  Private (Teacher)
+// @access  Private/Teacher
 exports.getStudents = async (req, res) => {
   try {
     const teacher = req.user;
@@ -353,6 +355,48 @@ exports.getStudents = async (req, res) => {
   }
 };
 
+// @desc    Create an announcement for the HOD
+// @route   POST /api/teacher/announcement
+// @access  Private/Teacher
+exports.createAnnouncement = async (req, res) => {
+  try {
+    const { title, message } = req.body;
+    const teacher = req.user;
+
+    // Find the HOD of the teacher's department
+    const hod = await User.findOne({ role: 'HOD', department: teacher.department });
+
+    if (!hod) {
+      return res.status(404).json({ message: 'HOD not found for this department.' });
+    }
+
+    // Create the announcement
+    const announcement = new Announcement({
+      title,
+      message,
+      department: teacher.department,
+      createdBy: teacher._id,
+      targetRoles: ['HOD'],
+    });
+    await announcement.save();
+
+    // Create a notification for the HOD
+    const notification = new Notification({
+      recipient: hod._id,
+      sender: teacher._id,
+      type: 'new_announcement',
+      message: `New announcement from ${teacher.name}: ${title}`,
+      related_announcement: announcement._id,
+    });
+    await notification.save();
+
+    res.status(201).json({ message: 'Announcement sent to HOD successfully.', announcement });
+  } catch (error) {
+    console.error('Error creating announcement:', error);
+    res.status(500).json({ message: 'Server error while creating announcement.' });
+  }
+};
+
 module.exports = {
   createClass: exports.createClass,
   updateClass: exports.updateClass,
@@ -364,4 +408,5 @@ module.exports = {
   updateVenueAnnouncement: exports.updateVenueAnnouncement,
   getVenueAnnouncements: exports.getVenueAnnouncements,
   getStudents: exports.getStudents,
+  createAnnouncement: exports.createAnnouncement,
 };

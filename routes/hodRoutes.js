@@ -3,7 +3,8 @@ const router = express.Router();
 const { 
   getDashboardData, 
   getAvailableStudents, 
-  enrollStudentInDepartment 
+  enrollStudentInDepartment,
+  createAnnouncement
 } = require('../controllers/hodController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
@@ -44,5 +45,10 @@ router.get('/teachers', protect, verifyRole(['HOD']), async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// @route   POST /api/hod/announcements
+// @desc    Create an announcement for the department
+// @access  Private (HOD)
+router.post('/announcements', protect, verifyRole(['HOD']), createAnnouncement);
 
 module.exports = router;

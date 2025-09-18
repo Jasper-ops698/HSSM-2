@@ -17,7 +17,7 @@ const getVenues = asyncHandler(async (req, res) => {
 // @route   POST /api/venues
 // @access  Private/Admin
 const createVenue = asyncHandler(async (req, res) => {
-  const { name, capacity } = req.body;
+  const { name, capacity, location } = req.body;
 
   if (!name) {
     res.status(400);
@@ -34,6 +34,7 @@ const createVenue = asyncHandler(async (req, res) => {
   const venue = new Venue({
     name,
     capacity,
+    location,
   });
 
   const createdVenue = await venue.save();

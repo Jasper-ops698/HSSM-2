@@ -35,6 +35,11 @@ const getDashboardData = async (req, res) => {
     // Customize data based on user role
     switch (user.role) {
       case 'student':
+        const student = await User.findById(user._id).select('name email role department credits');
+        if (!student) {
+          return res.status(404).json({ success: false, message: 'Student not found' });
+        }
+
         const enrollments = await Enrollment.find({ student: user._id }).populate({
           path: 'class',
           populate: {
@@ -44,7 +49,7 @@ const getDashboardData = async (req, res) => {
         });
         data.enrollments = enrollments;
         data.enrolledClassesCount = enrollments.length;
-        data.credits = user.credits || 0;
+        data.credits = student.credits || 0;
         data.pendingEnrollmentsCount = enrollments.filter(e => e.status === 'Pending').length;
         data.approvedEnrollmentsCount = enrollments.filter(e => e.status === 'Approved').length;
         break;

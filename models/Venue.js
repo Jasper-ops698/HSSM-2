@@ -7,6 +7,11 @@ const venueSchema = new mongoose.Schema({
     unique: true,
     trim: true,
   },
+  location: {
+    type: String,
+    required: false,
+    trim: true,
+  },
   capacity: {
     type: Number,
     required: false,

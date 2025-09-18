@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Booking = require('../models/Booking'); // Changed from Request
+// const Service = require('../models/Service'); // Commented out for now
 const { GeneratedReport, Incident, Asset, Task, MeterReading, Report } = require('../models/Hssm');
 const bcrypt = require('bcryptjs');
 
@@ -94,14 +96,49 @@ const deleteStaff = async (req, res) => {
     res.status(500).json({ message: 'Error deleting staff member', error: error.message });
   }
 };
+
 const getAllData = async (req, res) => {
   try {
-    const users = await User.find({}, 'name email role department'); // Fetch users with selected fields
-    res.status(200).json({ users });
+    // Fetch all data in parallel for efficiency
+    const [users, requests, services] = await Promise.all([
+      User.find({}).select('id username email role isDisabled twoFactorEnabled').lean(),
+      Request.find({}).lean(),
+      Service.find({}).lean(),
+    ]);
+
+    // Process data to get analytics counts
+    const userRoles = users.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {});
+
+    const requestStatuses = requests.reduce((acc, request) => {
+      acc[request.status] = (acc[request.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const servicesCount = services.reduce((acc, service) => {
+      // Assuming services have a 'category' field
+      const category = service.category || 'Uncategorized';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Send the comprehensive data required by the frontend
+    res.status(200).json({
+      users,
+      requests,
+      services,
+      userRoles,
+      requestStatuses,
+      servicesCount,
+    });
   } catch (error) {
+    console.error('Error fetching admin analytics data:', error);
     res.status(500).json({ msg: 'Error fetching data', error: error.message });
   }
 };
+
 const getAllReportsByHSSMProviders = async (req, res) => {
   try {
     // Find all HSSM-provider users

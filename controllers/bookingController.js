@@ -57,7 +57,7 @@ exports.createBooking = async (req, res) => {
     // Create Announcement
     const announcement = new Announcement({
       title: announcementTitle,
-      content: announcementContent,
+      message: announcementContent,
       department,
       createdBy: userId,
     });
@@ -74,7 +74,9 @@ exports.createBooking = async (req, res) => {
     });
     await booking.save();
 
-    res.status(201).json({ message: 'Booking and announcement created successfully.', booking });
+    const populatedBooking = await Booking.findById(booking._id).populate('venue', 'name location');
+
+    res.status(201).json({ message: 'Booking and announcement created successfully.', booking: populatedBooking });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

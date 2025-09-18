@@ -96,21 +96,29 @@ const getAllClasses = async (req, res) => {
     const user = req.user;
     let query = {};
 
-    // If the user is an HOD, they should only see classes in their department.
-    if (user.role === 'HOD') {
-      query.department = user.department;
-    } 
-    // Teachers also see classes in their department.
-    else if (user.role === 'teacher') {
+    // Filter classes based on user role and department
+    if (user.role === 'HOD' || user.role === 'student') {
       if (user.department) {
         query.department = user.department;
       }
+    } else if (user.role === 'teacher') {
+      if (user.department) {
+        query.department = user.department;
+      } else {
+        // Fallback for teachers: show classes they are assigned to if no department is set
+        query.teacher = user._id;
+      }
     }
-    // Admins can see all classes (no filter). Students can also see all classes.
+    // Admins can see all classes (no filter).
 
     const classes = await Class.find(query)
       .populate('teacher', 'name email');
-      
+
+    if (classes.length === 0) {
+      // To provide a better user experience, send a specific message.
+      return res.status(200).json([]); // Return empty array instead of 404
+    }
+
     res.status(200).json(classes);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });

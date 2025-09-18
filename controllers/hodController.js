@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const Class = require('../models/Class');
 const Enrollment = require('../models/Enrollment');
+const Announcement = require('../models/Announcement');
+const Notification = require('../models/Notification');
 
 // @desc    Get data for HOD Dashboard, scoped to their department
 // @route   GET /api/hod/dashboard
@@ -51,6 +53,49 @@ const getDashboardData = async (req, res) => {
   } catch (error) {
     console.error('Error fetching HOD dashboard data:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Create an announcement for the department
+// @route   POST /api/hod/announcements
+// @access  Private/HOD
+const createAnnouncement = async (req, res) => {
+  try {
+    const { title, message, targetRoles } = req.body;
+    const hod = req.user;
+
+    const announcement = new Announcement({
+      title,
+      message,
+      department: hod.department,
+      createdBy: hod._id,
+      targetRoles: targetRoles || ['student', 'teacher'], // Default to students and teachers
+    });
+
+    await announcement.save();
+
+    // Notify users in the department based on target roles
+    const usersToNotify = await User.find({
+      department: hod.department,
+      role: { $in: targetRoles },
+    });
+
+    const notifications = usersToNotify.map(user => ({
+      recipient: user._id,
+      sender: hod._id,
+      type: 'new_announcement',
+      message: `New announcement in ${hod.department}: ${title}`,
+      related_announcement: announcement._id,
+    }));
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
+    res.status(201).json({ message: 'Announcement created successfully.', announcement });
+  } catch (error) {
+    console.error('Error creating announcement:', error);
+    res.status(500).json({ message: 'Server error while creating announcement.' });
   }
 };
 
@@ -128,6 +173,7 @@ const enrollStudentInDepartment = async (req, res) => {
 
 module.exports = {
   getDashboardData,
+  createAnnouncement,
   getAvailableStudents,
   enrollStudentInDepartment,
 };
