@@ -3,7 +3,6 @@ const Absence = require('../models/Absence');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const Announcement = require('../models/Announcement');
-const Announcement = require('../models/Announcement');
 
 // @desc    Teacher creates a new class
 // @route   POST /api/teacher/class
