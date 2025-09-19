@@ -10,24 +10,30 @@ exports.reportAbsence = async (req, res) => {
     const userId = req.user._id;
     const department = req.user.department;
 
+    // Validate required fields
+    if (!role) {
+      return res.status(400).json({ message: 'Role is required.' });
+    }
+    if (!classId) {
+      return res.status(400).json({ message: 'Class is required.' });
+    }
+    if (!date) {
+      return res.status(400).json({ message: 'Date of absence is required.' });
+    }
+
     const absenceData = {
       reason,
       dateOfAbsence: date,
       duration,
       department,
       status: 'Pending',
+      class: classId,
     };
 
     if (role === 'teacher') {
       absenceData.teacher = userId;
-      if (classId) {
-        absenceData.class = classId;
-      }
     } else if (role === 'student') {
       absenceData.student = userId;
-      if (classId) {
-        absenceData.class = classId;
-      }
     } else {
       return res.status(400).json({ message: 'Invalid role specified.' });
     }

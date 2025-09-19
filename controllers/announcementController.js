@@ -247,20 +247,19 @@ exports.getMyAnnouncements = async (req, res) => {
   }
 };
 
-// @desc    Mark all announcements as read for the current user
-// @route   PUT /api/announcements/mark-all-read
+// @desc    Delete all announcements for the current user
+// @route   DELETE /api/announcements/delete-all
 // @access  Private
-exports.markAllAnnouncementsAsRead = async (req, res) => {
+exports.deleteAllAnnouncements = async (req, res) => {
   try {
-    const userId = req.user._id;
-    // Update all announcements that the user hasn't read yet
-    await Announcement.updateMany(
-      { readBy: { $ne: userId } },
-      { $addToSet: { readBy: userId } }
-    );
-    res.status(200).json({ message: 'All announcements marked as read' });
+    // Option 1: Delete all announcements (admin only)
+    // await Announcement.deleteMany({});
+
+    // Option 2: Delete all announcements created by the current user
+    await Announcement.deleteMany({ createdBy: req.user._id });
+    res.status(200).json({ message: 'All announcements deleted' });
   } catch (error) {
-    console.error('Error marking announcements as read:', error);
+    console.error('Error deleting announcements:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

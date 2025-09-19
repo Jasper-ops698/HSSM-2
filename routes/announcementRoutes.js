@@ -7,7 +7,7 @@ const {
   updateAnnouncement, 
   deleteAnnouncement,
   toggleAnnouncementStatus,
-  markAllAsRead,
+  deleteAllAnnouncements,
   getMyAnnouncements
 } = require('../controllers/announcementController');
 const { protect } = require('../middlewares/authMiddleware');
@@ -63,10 +63,11 @@ router.delete(
   deleteAnnouncement
 );
 
-// @route   PUT /api/announcements/mark-all-read
-// @desc    Mark all announcements as read for the current user
+
+// @route   DELETE /api/announcements/delete-all
+// @desc    Delete all announcements for the current user
 // @access  Private
-router.put('/mark-all-read', protect, markAllAsRead);
+router.delete('/delete-all', protect, deleteAllAnnouncements);
 
 // @route   GET /api/announcements/my-announcements
 // @desc    Get all announcements created by the logged-in user
