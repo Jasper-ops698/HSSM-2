@@ -273,4 +273,5 @@ module.exports = {
   toggleAnnouncementStatus: exports.toggleAnnouncementStatus,
   markAllAsRead: exports.markAllAnnouncementsAsRead,
   getMyAnnouncements: exports.getMyAnnouncements,
+  deleteAllAnnouncements: exports.deleteAllAnnouncements,
 };
