@@ -100,10 +100,9 @@ const deleteStaff = async (req, res) => {
 const getAllData = async (req, res) => {
   try {
     // Fetch all data in parallel for efficiency
-    const [users, requests, services] = await Promise.all([
-      User.find({}).select('id username email role isDisabled twoFactorEnabled').lean(),
-      Request.find({}).lean(),
-      Service.find({}).lean(),
+    const [users, bookings] = await Promise.all([
+      User.find({}).select('id username email role isDisabled twoFactorEnabled').lean().catch(e => { throw new Error('User query failed: ' + e.message); }),
+      Booking.find({}).lean().catch(e => { throw new Error('Booking query failed: ' + e.message); }),
     ]);
 
     // Process data to get analytics counts
@@ -112,26 +111,19 @@ const getAllData = async (req, res) => {
       return acc;
     }, {});
 
-    const requestStatuses = requests.reduce((acc, request) => {
-      acc[request.status] = (acc[request.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    const servicesCount = services.reduce((acc, service) => {
-      // Assuming services have a 'category' field
-      const category = service.category || 'Uncategorized';
-      acc[category] = (acc[category] || 0) + 1;
+    // Example: count bookings by department (customize as needed)
+    const bookingDepartments = bookings.reduce((acc, booking) => {
+      const dept = booking.department || 'Uncategorized';
+      acc[dept] = (acc[dept] || 0) + 1;
       return acc;
     }, {});
 
     // Send the comprehensive data required by the frontend
     res.status(200).json({
       users,
-      requests,
-      services,
+      bookings,
       userRoles,
-      requestStatuses,
-      servicesCount,
+      bookingDepartments,
     });
   } catch (error) {
     console.error('Error fetching admin analytics data:', error);

@@ -334,18 +334,14 @@ exports.getStudentTimetable = async (req, res) => {
       return res.status(400).json({ message: 'Week number is required.' });
     }
 
-    // Find classes the student is enrolled in
-    const enrolledClasses = await Class.find({
-      enrolledStudents: studentId,
-    }).select('name');
+    // Find all classes in the student's department
+    const departmentClasses = await Class.find({
+      department: studentDepartment
+    });
 
-    // Get subjects from enrolled classes
-    const enrolledSubjects = enrolledClasses.map(cls => cls.name);
-
-    // Find timetable entries for these subjects, department, and week
+    // Find timetable entries for the department and week (all classes, not just enrolled)
     const timetable = await Timetable.find({
       department: studentDepartment,
-      subject: { $in: enrolledSubjects },
       week: parseInt(week, 10)
     }).populate('teacher', 'name email');
 
@@ -364,9 +360,16 @@ exports.getStudentTimetable = async (req, res) => {
       groupedTimetable[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
     });
 
+    // Find classes the student is enrolled in (for frontend to highlight/enroll logic)
+    const enrolledClasses = await Class.find({
+      enrolledStudents: studentId,
+      department: studentDepartment
+    }).select('name');
+
     res.json({
       timetable: groupedTimetable,
-      enrolledClasses: enrolledClasses.length,
+      departmentClasses,
+      enrolledClasses: enrolledClasses.map(cls => cls.name),
       totalEntries: timetable.length,
       week: parseInt(week, 10)
     });
