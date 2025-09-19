@@ -82,7 +82,7 @@ app.options('*', cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 400 });
 app.use(limiter);
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
