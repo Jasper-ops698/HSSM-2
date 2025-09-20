@@ -69,7 +69,7 @@ const deleteVenue = asyncHandler(async (req, res) => {
   const venue = await Venue.findById(req.params.id);
 
   if (venue) {
-    await venue.remove();
+    await venue.deleteOne();
     res.json({ message: 'Venue removed' });
   } else {
     res.status(404);

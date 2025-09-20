@@ -1,3 +1,7 @@
+// @route   PATCH /api/announcements/mark-all-read
+// @desc    Mark all announcements as read for the current student (soft delete)
+// @access  Private (Student)
+router.patch('/mark-all-read', protect, verifyRole(['student']), require('../controllers/announcementController').markAllAnnouncementsAsRead);
 const express = require('express');
 const router = express.Router();
 const { 

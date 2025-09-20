@@ -1,3 +1,38 @@
+// @desc    Mark all announcements as read for the current student (soft delete)
+// @route   PATCH /api/announcements/mark-all-read
+// @access  Private (Student)
+exports.markAllAnnouncementsAsRead = async (req, res) => {
+  try {
+    // Only students can use this endpoint
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'Only students can mark all announcements as read.' });
+    }
+    // Find all announcements visible to this student
+    const userId = req.user._id;
+    const currentDate = new Date();
+    const query = {
+      active: true,
+      $and: [
+        { startDate: { $lte: currentDate } },
+        { $or: [{ endDate: null }, { endDate: { $gte: currentDate } }] }
+      ],
+      $or: [
+        { targetRoles: 'all' },
+        { targetRoles: req.user.role },
+        { department: req.user.department }
+      ]
+    };
+    // Update all matching announcements to add this student's ID to readBy
+    await Announcement.updateMany(
+      query,
+      { $addToSet: { readBy: userId } }
+    );
+    res.status(200).json({ message: 'All announcements marked as read for this student.' });
+  } catch (error) {
+    console.error('Error marking all announcements as read:', error);
+    res.status(500).json({ message: 'Server error while marking announcements as read.' });
+  }
+};
 const Announcement = require('../models/Announcement');
 
 // @desc    Create a new announcement
@@ -271,7 +306,7 @@ module.exports = {
   updateAnnouncement: exports.updateAnnouncement,
   deleteAnnouncement: exports.deleteAnnouncement,
   toggleAnnouncementStatus: exports.toggleAnnouncementStatus,
-  markAllAsRead: exports.markAllAnnouncementsAsRead,
+  markAllAnnouncementsAsRead: exports.markAllAnnouncementsAsRead,
   getMyAnnouncements: exports.getMyAnnouncements,
   deleteAllAnnouncements: exports.deleteAllAnnouncements,
 };

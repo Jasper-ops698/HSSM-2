@@ -21,13 +21,14 @@ exports.reportAbsence = async (req, res) => {
       return res.status(400).json({ message: 'Date of absence is required.' });
     }
 
+    const mongoose = require('mongoose');
     const absenceData = {
       reason,
       dateOfAbsence: date,
       duration,
       department,
       status: 'Pending',
-      class: classId,
+      class: mongoose.Types.ObjectId(classId),
     };
 
     if (role === 'teacher') {
