@@ -1,7 +1,6 @@
 // @route   PATCH /api/announcements/mark-all-read
 // @desc    Mark all announcements as read for the current student (soft delete)
 // @access  Private (Student)
-router.patch('/mark-all-read', protect, verifyRole(['student']), require('../controllers/announcementController').markAllAnnouncementsAsRead);
 const express = require('express');
 const router = express.Router();
 const { 
@@ -12,10 +11,15 @@ const {
   deleteAnnouncement,
   toggleAnnouncementStatus,
   deleteAllAnnouncements,
-  getMyAnnouncements
+  getMyAnnouncements,
+  markAllAnnouncementsAsRead
 } = require('../controllers/announcementController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
+
+// Mark all announcements as read for the current student
+router.patch('/mark-all-read', protect, verifyRole(['student']), markAllAnnouncementsAsRead);
+
 
 // @route   POST /api/announcements
 // @desc    Create a new announcement
