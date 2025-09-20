@@ -152,7 +152,7 @@ connectToDatabase()
     app.use('/api/admin', adminRoutes);
     app.use('/api/ai', aiRoutes);
     app.use('/api/announcements', announcementRoutes);
-    app.use('/api/credits', creditRoutes);
+    app.use('/api/credit', creditRoutes);
     app.use('/api/auth/google', googleAuthRoutes);
     app.use('/api/hod', hodRoutes);
     app.use('/api/hssm-dashboard', hssmDashboardRoutes);
