@@ -12,8 +12,11 @@ const {
     deleteHssmProviderReport, 
     disableStaff, 
     deleteHssmProvider, 
-    disableHssmProvider 
+    disableHssmProvider,
+    downloadDepartmentReportCsv
 } = require('../controllers/adminController');
+// Download department activity report as CSV (admin only)
+router.get('/department-report-csv', protect, verifyRole(['admin']), downloadDepartmentReportCsv);
 
 // Assign role to a staff (teacher, credit-controller, HOD)
 router.post('/assignRole', protect, verifyRole(['admin']), assignUserRole);

@@ -1,3 +1,82 @@
+const { Parser } = require('json2csv');
+// @desc    Download department activity report as CSV
+// @route   GET /api/admin/department-report-csv?department=DEPT&period=week|month&start=YYYY-MM-DD
+// @access  Private/Admin
+const downloadDepartmentReportCsv = async (req, res) => {
+  try {
+    const { department, period = 'week', start } = req.query;
+    if (!department) {
+      return res.status(400).json({ message: 'Department is required' });
+    }
+    // Calculate date range
+    let startDate = start ? new Date(start) : new Date();
+    let endDate = new Date(startDate);
+    if (period === 'week') {
+      endDate.setDate(startDate.getDate() + 7);
+    } else if (period === 'month') {
+      endDate.setMonth(startDate.getMonth() + 1);
+    }
+    // Fetch users in department
+    const users = await User.find({ department }).select('name email role createdAt updatedAt');
+    // Fetch activities (example: bookings, can add more models as needed)
+    const bookings = await Booking.find({ department, createdAt: { $gte: startDate, $lt: endDate } }).select('student teacher className createdAt');
+
+    // Fetch absences for this department and date range
+    const Absence = require('../models/Absence');
+    const absences = await Absence.find({
+      department,
+      dateOfAbsence: { $gte: startDate, $lt: endDate }
+    })
+      .populate('teacher', 'name email role')
+      .populate('student', 'name email role')
+      .populate('class', 'name');
+
+    // Compose report rows
+    const rows = [];
+    users.forEach(user => {
+      rows.push({
+        Type: 'User',
+        Name: user.name,
+        Email: user.email,
+        Role: user.role,
+        Activity: 'Account',
+        Date: user.createdAt.toISOString(),
+        Details: 'User account created'
+      });
+    });
+    bookings.forEach(b => {
+      rows.push({
+        Type: 'Booking',
+        Name: b.student || '',
+        Email: '',
+        Role: 'student',
+        Activity: 'Booking',
+        Date: b.createdAt.toISOString(),
+        Details: `Class: ${b.className}, Teacher: ${b.teacher}`
+      });
+    });
+    absences.forEach(a => {
+      rows.push({
+        Type: 'Absence',
+        Name: a.teacher ? a.teacher.name : (a.student ? a.student.name : ''),
+        Email: a.teacher ? a.teacher.email : (a.student ? a.student.email : ''),
+        Role: a.teacher ? a.teacher.role : (a.student ? a.student.role : ''),
+        Activity: 'Absence',
+        Date: a.dateOfAbsence ? a.dateOfAbsence.toISOString() : '',
+        Details: `Reason: ${a.reason || ''}, Class: ${a.class && a.class.name ? a.class.name : ''}, Status: ${a.status}`
+      });
+    });
+    // Generate CSV
+    const parser = new Parser();
+    const csv = parser.parse(rows);
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`${department}_activity_report_${period}_${startDate.toISOString().slice(0,10)}.csv`);
+    return res.send(csv);
+  } catch (error) {
+    console.error('Error generating department report CSV:', error);
+    res.status(500).json({ message: 'Error generating report', error: error.message });
+  }
+};
 const User = require('../models/User');
 const Booking = require('../models/Booking'); // Changed from Request
 // const Service = require('../models/Service'); // Commented out for now
@@ -356,4 +435,5 @@ module.exports = {
   disableStaff,
   deleteHssmProvider,
   disableHssmProvider,
+  downloadDepartmentReportCsv,
 };
