@@ -18,7 +18,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
 
 // delete announcements for current student only, developer should adjust the endpoint name for clarity.
-router.patch('/mark-all-read', protect, verifyRole(['student']), deleteAllAnnouncements);
+router.patch('/mark-all-read', protect, verifyRole(['student']), markAllAnnouncementsAsRead);
 
 
 // @route   POST /api/announcements
