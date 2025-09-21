@@ -150,10 +150,28 @@ exports.getDashboardData = async (req, res) => {
       { description: "Class 'Intro to Chemistry' was updated", timestamp: new Date() }
     ];
 
+    // Get student absences for classes taught by this teacher
+    const studentAbsences = await Absence.find({
+      class: { $in: classes.map(c => c._id) },
+      student: { $ne: null }
+    })
+      .populate('student', 'name email')
+      .populate('class', 'name')
+      .sort({ dateOfAbsence: -1 });
+
+    // Get teacher's own absences
+    const teacherAbsences = await Absence.find({
+      teacher: teacherId
+    })
+      .populate('class', 'name')
+      .sort({ dateOfAbsence: -1 });
+
     res.json({
       totalClasses,
       totalStudents,
-      recentActivity
+      recentActivity,
+      absences: studentAbsences,
+      teacherAbsences
     });
   } catch (error) {
     console.error('Error fetching teacher dashboard data:', error);

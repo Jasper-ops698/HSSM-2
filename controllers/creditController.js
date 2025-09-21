@@ -60,7 +60,7 @@ const addCredits = async (req, res) => {
       previousBalance: previousBalance,
       newBalance: user.credits,
       reason: reason,
-      createdBy: req.user._id, // Corrected from 'performedBy'
+      performedBy: req.user._id, // Correct field for schema
       transactionType: 'manual'
     });
 

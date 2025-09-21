@@ -82,8 +82,17 @@ app.options('*', cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 400 });
-app.use(limiter);
+
+// Global limiter (less strict, or remove entirely if you want per-route only)
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 400 });
+// app.use(globalLimiter); // Uncomment if you want a global fallback
+
+// Stricter limiter for frequently-called endpoints (e.g., dashboard polling)
+const dashboardLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 60, // 60 requests per 15 minutes (1 per 15 seconds on average)
+  message: 'Too many dashboard requests, please slow down.'
+});
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -142,10 +151,11 @@ connectToDatabase()
     });
 
     // --- API Route Middleware ---
-    app.use("/api/auth", authRoutes);
-    app.use("/api/enrollments", enrollmentRoutes);
-    app.use("/api/classes", classRoutes);
-    app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/auth", authRoutes);
+  app.use("/api/enrollments", enrollmentRoutes);
+  app.use("/api/classes", classRoutes);
+  // Apply stricter limiter to dashboard endpoints
+  app.use("/api/dashboard", dashboardLimiter, dashboardRoutes);
     app.use('/api/bookings', bookingRoutes);
     app.use('/api/venues', venueRoutes);
     app.use('/api/absence', absenceRoutes);

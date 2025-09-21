@@ -34,7 +34,7 @@ router.post(
 router.post(
   '/deduct',
   protect,
-  verifyRole(['credit-controller', 'admin', 'teacher']), // Added teacher role
+  verifyRole(['credit-controller', 'admin']), 
   deductCredits
 );
 
