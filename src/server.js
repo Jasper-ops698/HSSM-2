@@ -1,3 +1,4 @@
+const Absence = require('../models/Absence');
 // --- Import Routes ---
 // Ensure paths are correct relative to this file's location
 // absenceRoutes will be imported after app initialization
@@ -233,6 +234,28 @@ connectToDatabase()
         }
       } catch (error) {
         console.error('Error in class reminder scheduler:', error);
+      }
+    });
+
+    // Delete expired absences daily at 2:00 AM
+    cron.schedule('0 2 * * *', async () => {
+      try {
+        const now = new Date();
+        // Absence expires after dateOfAbsence + duration (in days)
+        // So, delete if now > dateOfAbsence + duration days
+        const expired = await Absence.deleteMany({
+          $expr: {
+            $lt: [
+              { $add: ["$dateOfAbsence", { $multiply: ["$duration", 24 * 60 * 60 * 1000] }] },
+              now
+            ]
+          }
+        });
+        if (expired.deletedCount > 0) {
+          console.log(`Deleted ${expired.deletedCount} expired absences at ${now.toISOString()}`);
+        }
+      } catch (error) {
+        console.error('Error deleting expired absences:', error);
       }
     });
 
