@@ -1,9 +1,9 @@
+const express = require('express');
+const router = express.Router();
 // @route   GET /api/absence/:id
 // @desc    Get a single absence by ID
 // @access  Private (HOD, teacher, or student with access)
 router.get('/:id', protect, absenceController.getAbsenceById);
-const express = require('express');
-const router = express.Router();
 const absenceController = require('../controllers/absenceController');
 const { protect } = require('../middlewares/authMiddleware');
 const verifyRole = require('../middlewares/verifyRole');
