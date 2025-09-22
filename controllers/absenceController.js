@@ -1,3 +1,8 @@
+const Absence = require('../models/Absence');
+const User = require('../models/User');
+const Timetable = require('../models/Timetable');
+const Announcement = require('../models/Announcement');
+
 // Get a single absence by ID
 exports.getAbsenceById = async (req, res) => {
   try {
@@ -10,10 +15,6 @@ exports.getAbsenceById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-const Absence = require('../models/Absence');
-const User = require('../models/User');
-const Timetable = require('../models/Timetable');
-const Announcement = require('../models/Announcement');
 
 // Report absence
 exports.reportAbsence = async (req, res) => {
