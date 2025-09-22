@@ -236,6 +236,7 @@ exports.createAbsence = async (req, res) => {
 };
 
 module.exports = {
+  getAbsenceById: exports.getAbsenceById,
   reportAbsence: exports.reportAbsence,
   getAbsences: exports.getAbsences,
   assignReplacement: exports.assignReplacement,
