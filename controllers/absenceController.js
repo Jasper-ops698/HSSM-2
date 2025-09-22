@@ -1,3 +1,15 @@
+// Get a single absence by ID
+exports.getAbsenceById = async (req, res) => {
+  try {
+    const absence = await Absence.findById(req.params.id).populate('teacher student class replacementTeacher');
+    if (!absence) {
+      return res.status(404).json({ message: 'Absence not found.' });
+    }
+    res.json(absence);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 const Absence = require('../models/Absence');
 const User = require('../models/User');
 const Timetable = require('../models/Timetable');
@@ -19,6 +31,9 @@ exports.reportAbsence = async (req, res) => {
     }
     if (!date) {
       return res.status(400).json({ message: 'Date of absence is required.' });
+    }
+    if (duration === undefined || duration === null || duration === '' || isNaN(Number(duration)) || Number(duration) <= 0) {
+      return res.status(400).json({ message: 'Duration is required and must be a positive number.' });
     }
 
     const mongoose = require('mongoose');
