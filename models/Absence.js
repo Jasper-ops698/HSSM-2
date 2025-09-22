@@ -7,10 +7,11 @@ const absenceSchema = new mongoose.Schema({
   class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
   department: { type: String, required: true },
   dateOfAbsence: { type: Date, required: true },
+  duration: { type: Number, required: true },
   reason: { type: String },
   status: {
     type: String,
-    enum: ['Pending', 'Covered', 'Cancelled'],
+    enum: ['Pending', 'pending', 'approved', 'rejected', 'Covered', 'Cancelled'],
     default: 'Pending',
   },
   replacementTeacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

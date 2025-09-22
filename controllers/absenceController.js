@@ -25,7 +25,7 @@ exports.reportAbsence = async (req, res) => {
     const absenceData = {
       reason,
       dateOfAbsence: date,
-      duration,
+      duration: Number(duration), // Ensure duration is a number
       department,
       status: 'Pending',
       class: mongoose.Types.ObjectId(classId),
