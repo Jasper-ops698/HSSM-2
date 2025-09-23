@@ -61,13 +61,20 @@ const getDashboardData = async (req, res) => {
 // @access  Private/HOD
 const createAnnouncement = async (req, res) => {
   try {
-    const { title, message, targetRoles: rawTargetRoles } = req.body;
+    // Accept either 'message' or 'content' from the client for backwards compatibility
+    const { title, message: rawMessage, content, targetRoles: rawTargetRoles } = req.body;
+    const message = rawMessage || content;
     const hod = req.user;
 
     // Ensure targetRoles is an array, providing a default if it's missing or empty
     const targetRoles = (Array.isArray(rawTargetRoles) && rawTargetRoles.length > 0)
       ? rawTargetRoles
       : ['student', 'teacher'];
+
+    // Validate required fields early and return a clear error
+    if (!title || !message) {
+      return res.status(400).json({ message: 'Title and message are required.' });
+    }
 
     const announcement = new Announcement({
       title,

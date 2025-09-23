@@ -361,15 +361,18 @@ exports.getStudentTimetable = async (req, res) => {
     });
 
     // Find classes the student is enrolled in (for frontend to highlight/enroll logic)
+    // NOTE: Return enrolledClasses as an array of class IDs (strings) for a consistent shape
+    // across clients. Frontend should use these IDs to match against class._id values.
     const enrolledClasses = await Class.find({
       enrolledStudents: studentId,
       department: studentDepartment
-    }).select('name');
+    }).select('_id');
 
     res.json({
       timetable: groupedTimetable,
       departmentClasses,
-      enrolledClasses: enrolledClasses.map(cls => cls.name),
+      // Return consistent array of string IDs
+      enrolledClasses: enrolledClasses.map(cls => String(cls._id)),
       totalEntries: timetable.length,
       week: parseInt(week, 10)
     });
@@ -443,10 +446,13 @@ exports.getTodayTimetable = async (req, res) => {
     }
     const currentWeek = anyTimetableEntry.week;
 
-    // Find classes the student is enrolled in
+    // Find classes the student is enrolled in. We select both _id and name here because
+    // the subsequent query filters timetable entries by subject name. Note: the
+    // GET /api/timetable/student endpoint now returns `enrolledClasses` as an array of
+    // class ID strings for consistency.
     const enrolledClasses = await Class.find({
       enrolledStudents: studentId,
-    }).select('name');
+    }).select('_id name');
 
     const enrolledSubjects = enrolledClasses.map(cls => cls.name);
 

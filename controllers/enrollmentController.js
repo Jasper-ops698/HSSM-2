@@ -4,6 +4,8 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const sendFCMNotification = require('../utils/sendFCMNotification');
 const NotificationService = require('../services/notificationService');
+// Socket helper to emit real-time events
+const { getIO } = require('../src/socket');
 
 /**
  * Student requests to enroll in a class
@@ -78,9 +80,30 @@ exports.requestEnrollment = async (req, res) => {
     });
     await newEnrollment.save();
 
-    // --- Notify Teacher and HOD ---
+    // Load teacher and HOD so we can include extra context in emits
     const teacher = await User.findById(targetClass.teacher);
     const hod = await User.findById(targetClass.HOD);
+
+    // Emit a socket event so connected clients (teacher/student dashboards) can update in real-time
+    try {
+      const io = getIO();
+      const payload = {
+        studentId: String(studentId),
+        classId: String(classId),
+        enrollmentId: newEnrollment._id,
+        status: 'Pending',
+        studentName: student.name,
+        className: targetClass.name,
+      };
+      // Emit to the student room so the student's clients can reconcile (if needed)
+      io.to(`user:${String(studentId)}`).emit('enrollment_requested', payload);
+      // Notify the teacher and HOD if they are present
+      if (teacher && teacher._id) io.to(`user:${String(teacher._id)}`).emit('enrollment_requested', payload);
+      if (hod && hod._id) io.to(`user:${String(hod._id)}`).emit('enrollment_requested', payload);
+    } catch (emitErr) {
+      // Socket might not be initialized in some environments (e.g., tests); don't fail the request because of emit errors
+      console.warn('Failed to emit enrollment_requested socket event:', emitErr.message || emitErr);
+    }
 
     const recipients = [];
     if (teacher?.deviceToken) recipients.push(teacher);
@@ -156,6 +179,25 @@ exports.respondToEnrollment = async (req, res) => {
 
     await enrollment.save();
 
+    // Emit an update event so clients can reconcile the new enrollment status
+    try {
+      const io = getIO();
+      const payload = {
+        studentId: String(enrollment.student._id || enrollment.student),
+        classId: String(targetClass._id),
+        status: enrollment.status,
+        enrollmentId: enrollment._id,
+        studentName: enrollment.student?.name || undefined,
+        className: targetClass?.name || undefined,
+      };
+      // Emit to the affected student
+      io.to(`user:${String(enrollment.student._id || enrollment.student)}`).emit('enrollment_updated', payload);
+      // Emit to the class teacher and HOD so they can refresh their views
+      if (targetClass.teacher) io.to(`user:${String(targetClass.teacher)}`).emit('enrollment_updated', payload);
+      if (targetClass.HOD) io.to(`user:${String(targetClass.HOD)}`).emit('enrollment_updated', payload);
+    } catch (emitErr) {
+      console.warn('Failed to emit enrollment_updated socket event:', emitErr.message || emitErr);
+    }
     // --- Notify Student ---
     if (enrollment.student.deviceToken) {
       const notificationMessage = {
