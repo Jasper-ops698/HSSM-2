@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const CreditTransaction = require('../models/CreditTransaction');
 const NotificationService = require('../services/notificationService');
+const { getIO } = require('../src/socket');
 
 // @desc    Get data for Credit Controller Dashboard (students and their credits)
 // @route   GET /api/credit/dashboard
@@ -67,6 +68,15 @@ const addCredits = async (req, res) => {
     // Send notification to the user
     await NotificationService.sendCreditNotification(userId, amount, 'add');
 
+    // Emit socket event to notify user's connected clients about credit update
+    try {
+      const io = getIO();
+      const payload = { userId: String(user._id), credits: user.credits, amount, action: 'add' };
+      io.to(`user:${String(user._id)}`).emit('credit_updated', payload);
+    } catch (emitErr) {
+      console.warn('Failed to emit credit_updated socket event:', emitErr.message || emitErr);
+    }
+
     res.json({
       message: `Successfully added ${amount} credits. New balance is ${user.credits}.`,
       user: {
@@ -121,6 +131,15 @@ const deductCredits = async (req, res) => {
 
     // Send notification to the user
     await NotificationService.sendCreditNotification(userId, amount, 'deduct');
+
+    // Emit socket event to notify user's connected clients about credit update
+    try {
+      const io = getIO();
+      const payload = { userId: String(user._id), credits: user.credits, amount, action: 'deduct' };
+      io.to(`user:${String(user._id)}`).emit('credit_updated', payload);
+    } catch (emitErr) {
+      console.warn('Failed to emit credit_updated socket event:', emitErr.message || emitErr);
+    }
 
     res.json({
       message: `Successfully deducted ${amount} credits. New balance is ${user.credits}.`,

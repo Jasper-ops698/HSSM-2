@@ -92,7 +92,10 @@ const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 400 });
 const dashboardLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 60, // 60 requests per 15 minutes (1 per 15 seconds on average)
-  message: 'Too many dashboard requests, please slow down.'
+  message: 'Too many dashboard requests, please slow down.',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the deprecated `X-RateLimit-*` headers
+  // If a client exceeds the limit, express-rate-limit will include a Retry-After header
 });
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
