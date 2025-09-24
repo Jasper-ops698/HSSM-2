@@ -26,6 +26,8 @@ router.get('/dashboard', protect, verifyRole(['teacher']), getDashboardData);
 // @desc    Mark student attendance
 // @access  Private (Teacher)
 router.post('/attendance', protect, verifyRole(['teacher']), markAttendance);
+// Bulk attendance marking: accepts { classId, date, attendance: [{ studentId, status }, ...] }
+router.post('/attendance/bulk', protect, verifyRole(['teacher']), require('../controllers/teacherController').bulkMarkAttendance);
 
 // Class management routes
 // @route   POST /api/teacher/class

@@ -40,7 +40,7 @@ const Announcement = require('../models/Announcement');
 // @access  Private (Admin, HOD, Teacher)
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { title, message, content, department, targetRoles, priority, startDate, endDate, isActive, active } = req.body;
+  const { title, message, content, department, targetRoles, priority, startDate, endDate, isActive, active, targetClass, targetAudience } = req.body;
     
     // Handle field name differences (frontend uses 'content', backend uses 'message')
     const announcementMessage = message || content;
@@ -56,6 +56,8 @@ exports.createAnnouncement = async (req, res) => {
       message: announcementMessage,
       department: department || req.user.department,
       targetRoles: targetRoles || (req.user.role === 'admin' ? ['admin', 'HOD', 'teacher'] : ['all']),
+      targetClass: targetClass || undefined,
+      targetAudience: targetAudience || 'all',
       createdBy: req.user._id,
       active: active !== undefined ? active : (isActive !== undefined ? isActive : true),
       priority: priority || 'medium',

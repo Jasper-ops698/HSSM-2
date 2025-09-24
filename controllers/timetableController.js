@@ -5,6 +5,9 @@ const xlsx = require('xlsx');
 const VENUES = require('../config/venues');
 const NotificationService = require('../services/notificationService');
 const Venue = require('../models/Venue');
+const Announcement = require('../models/Announcement');
+const Notification = require('../models/Notification');
+const { getIO } = require('../src/socket');
 
 // Helper function to parse week ranges from sheet names (e.g., "Weeks 1-5" or "Week 6")
 function parseWeekRange(sheetName) {
@@ -165,10 +168,17 @@ if (!term || !startDate || !endDate) {
           currentWeekEnd.setDate(currentWeekEnd.getDate() + 6);
 
           for (const row of weeklySchedule) {
-            const { subject, teacherEmail, dayOfWeek, startTime, endTime } = row;
-            if (!subject || !teacherEmail || !dayOfWeek || !startTime || !endTime) {
+            const { subject, teacherEmail, dayOfWeek: rawDay, startTime, endTime } = row;
+            if (!subject || !teacherEmail || !rawDay || !startTime || !endTime) {
               continue; // Skip incomplete rows
             }
+
+            // Normalize dayOfWeek to stable lowercase key (e.g., 'monday')
+            const WEEKDAY_KEYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+            const dayLower = String(rawDay).trim().toLowerCase();
+            // Map common short forms like 'mon' or 'monday' to the key
+            const foundIndex = WEEKDAY_KEYS.findIndex(k => k === dayLower || k.startsWith(dayLower) || dayLower.startsWith(k));
+            const normalizedDay = foundIndex !== -1 ? WEEKDAY_KEYS[foundIndex] : dayLower;
 
             const teacher = await User.findOne({ email: teacherEmail });
             if (!teacher) {
@@ -181,7 +191,7 @@ if (!term || !startDate || !endDate) {
               subject,
               teacher: teacher._id,
               department,
-              dayOfWeek,
+              dayOfWeek: normalizedDay,
               startTime,
               endTime,
               venue: null, // Venue is optional
@@ -316,7 +326,7 @@ async function autoGenerateClassesFromTimetable(timetableData, department) {
 
 exports.getTimetable = async (req, res) => {
   try {
-    const timetable = await Timetable.find().populate('teacher', 'name');
+  const timetable = await Timetable.find().populate('teacher', 'name').populate('replacement.teacher', 'name');
     res.json(timetable);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch timetable.' });
@@ -398,6 +408,8 @@ exports.getTeacherTimetable = async (req, res) => {
       department: teacherDepartment,
       week: parseInt(week, 10)
     }).populate('teacher', 'name email');
+    // Also populate any replacement teacher info
+    timetable.forEach(t => t.populate && t.populate('replacement.teacher', 'name').catch(() => {}));
 
     // Group by day for better display
     const groupedTimetable = timetable.reduce((acc, entry) => {
@@ -429,8 +441,9 @@ exports.getTodayTimetable = async (req, res) => {
   try {
     const studentId = req.user.id;
     const studentDepartment = req.user.department;
-    const today = new Date();
-    const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const today = new Date();
+  const WEEKDAY_KEYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  const dayOfWeek = WEEKDAY_KEYS[today.getDay()];
 
     // Find the current week number based on today's date
     // This logic assumes term start/end dates are stored somewhere accessible
@@ -464,11 +477,126 @@ exports.getTodayTimetable = async (req, res) => {
       week: currentWeek
     }).populate('teacher', 'name email');
 
+    // Populate replacement teacher where present
+    for (const tt of todayTimetable) {
+      try { await tt.populate('replacement.teacher', 'name'); } catch (e) { /* ignore */ }
+    }
+
     // Sort by start time
     todayTimetable.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     res.json(todayTimetable);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch today\'s timetable.' });
+  }
+};
+
+// Assign a replacement teacher for a specific timetable entry (HOD/Admin only)
+exports.assignReplacement = async (req, res) => {
+  try {
+    const timetableId = req.params.id;
+    const { replacementTeacherId, replacementName, reason } = req.body;
+
+    if (!timetableId) {
+      return res.status(400).json({ message: 'Timetable entry id is required' });
+    }
+
+    const entry = await Timetable.findById(timetableId).populate('teacher', 'name');
+    if (!entry) {
+      return res.status(404).json({ message: 'Timetable entry not found' });
+    }
+
+    // Build replacement object
+    const replacement = {};
+    if (replacementTeacherId) replacement.teacher = replacementTeacherId;
+    if (replacementName) replacement.teacherName = replacementName;
+    replacement.reason = reason || '';
+    replacement.assignedBy = req.user._id;
+    replacement.assignedAt = new Date();
+
+    entry.replacement = replacement;
+    await entry.save();
+
+    // Create an announcement so students and the assigned teacher are notified
+    try {
+      const classForSubject = await Class.findOne({ name: entry.subject, department: entry.department });
+      const announcementTitle = `Teacher change for ${entry.subject}`;
+      const announcementMessage = `A replacement teacher has been assigned for ${entry.subject} on ${entry.dayOfWeek} ${entry.startTime} - ${entry.endTime}. Replacement: ${replacement.teacherName || 'Assigned teacher'}. Reason: ${replacement.reason || 'Not specified'}`;
+
+      const announcement = new Announcement({
+        title: announcementTitle,
+        message: announcementMessage,
+        department: entry.department,
+        targetRoles: ['student', 'teacher'],
+        createdBy: req.user._id,
+        active: true,
+        startDate: new Date()
+      });
+      if (classForSubject) {
+        announcement.targetClass = classForSubject._id; // note: Announcement schema may not have targetClass; but controller earlier accepts arbitrary fields
+      }
+      await announcement.save();
+      // Create a notification for the replacement teacher if provided
+      if (replacement.teacher) {
+        try {
+          const replacementTeacher = await User.findById(replacement.teacher).select('name');
+          if (replacementTeacher) {
+            await Notification.create({
+              recipient: replacementTeacher._id,
+              type: 'substitute_assigned',
+              title: 'You have been assigned as a substitute',
+              message: `You have been assigned to cover ${entry.subject} on ${entry.dayOfWeek} ${entry.startTime} - ${entry.endTime}.`,
+              data: { timetableId: entry._id }
+            });
+
+            // Emit socket event to the replacement teacher
+            try {
+              const io = getIO();
+              io.to(`user:${replacementTeacher._id}`).emit('replacement_assigned', { timetableId: entry._id, subject: entry.subject, dayOfWeek: entry.dayOfWeek, startTime: entry.startTime, endTime: entry.endTime });
+            } catch (e) {
+              console.warn('Socket emit failed for replacement_assigned (timetable):', e.message || e);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to create notification for replacement teacher:', e.message || e);
+        }
+      }
+
+      // Emit timetable_updated to class room if available
+      try {
+        const io = getIO();
+        if (entry.class) io.to(`class:${String(entry.class)}`).emit('timetable_updated', { entryId: entry._id, replacement: entry.replacement });
+      } catch (e) {
+        console.warn('Socket emit failed for timetable_updated (timetable):', e.message || e);
+      }
+    } catch (announceErr) {
+      console.warn('Failed to create announcement for replacement assignment:', announceErr);
+    }
+
+    res.status(200).json({ message: 'Replacement assigned', entry });
+  } catch (error) {
+    console.error('Error assigning replacement:', error);
+    res.status(500).json({ message: 'Failed to assign replacement' });
+  }
+};
+
+// Get timetable entries for a specific class (by Class _id)
+exports.getEntriesForClass = async (req, res) => {
+  try {
+    const classId = req.params.classId;
+    const { week } = req.query;
+
+    const cls = await Class.findById(classId);
+    if (!cls) return res.status(404).json({ message: 'Class not found' });
+
+    const query = { subject: cls.name, department: cls.department };
+    if (week) query.week = parseInt(week, 10);
+
+    const entries = await Timetable.find(query).populate('teacher', 'name email').populate('replacement.teacher', 'name');
+
+    res.status(200).json({ success: true, entries });
+  } catch (error) {
+    console.error('Error fetching timetable entries for class:', error);
+    res.status(500).json({ message: 'Failed to fetch entries' });
   }
 };

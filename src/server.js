@@ -262,6 +262,19 @@ connectToDatabase()
       }
     });
 
+    // Archive past timetable entries daily at 3:00 AM
+    cron.schedule('0 3 * * *', async () => {
+      try {
+        const now = new Date();
+        const result = await Timetable.updateMany({ endDate: { $lt: now }, archived: { $ne: true } }, { $set: { archived: true } });
+        if (result.modifiedCount > 0) {
+          console.log(`Archived ${result.modifiedCount} past timetable entries at ${now.toISOString()}`);
+        }
+      } catch (err) {
+        console.error('Error archiving past timetable entries:', err);
+      }
+    });
+
     // --- Socket.io Configuration ---
     const server = http.createServer(app);
     const io = initSocket(server, allowedOrigins);

@@ -2,6 +2,8 @@ const Absence = require('../models/Absence');
 const User = require('../models/User');
 const Timetable = require('../models/Timetable');
 const Announcement = require('../models/Announcement');
+const Notification = require('../models/Notification');
+const { getIO } = require('../src/socket');
 
 // Get a single absence by ID
 exports.getAbsenceById = async (req, res) => {
@@ -109,35 +111,77 @@ exports.assignReplacement = async (req, res) => {
     await absence.save();
 
     // Update timetable temporarily
+    // Normalize dayOfWeek to stable lowercase key (sunday..saturday) using UTC
+    const WEEKDAY_KEYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const absenceDate = new Date(absence.dateOfAbsence);
+    const dayKey = WEEKDAY_KEYS[absenceDate.getUTCDay()];
+
     const timetableEntry = await Timetable.findOne({
       teacher: absence.teacher,
       class: absence.class,
-      dayOfWeek: new Date(absence.dateOfAbsence).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
+      dayOfWeek: dayKey,
     });
 
     if (timetableEntry) {
-      timetableEntry.teacher = replacementTeacherId;
+      // Prefer session-level replacement object if available rather than permanently changing teacher
+      timetableEntry.replacement = timetableEntry.replacement || {};
+      timetableEntry.replacement.teacher = replacementTeacherId;
+      timetableEntry.replacement.assignedBy = req.user._id;
+      timetableEntry.replacement.assignedAt = new Date();
       await timetableEntry.save();
     }
 
-    // Notify replacement teacher
-    const replacementTeacher = await User.findById(replacementTeacherId);
+    // Notify replacement teacher via Notification + Announcement + socket
+    const replacementTeacher = replacementTeacherId ? await User.findById(replacementTeacherId) : null;
     if (replacementTeacher) {
+      // Create a targeted notification
+      await Notification.create({
+        recipient: replacementTeacher._id,
+        type: 'substitute_assigned',
+        title: 'You have been assigned as a substitute',
+        message: `You have been assigned to replace ${absence.teacher ? absence.teacher.name || absence.teacher : 'the teacher'} for class on ${absence.dateOfAbsence}.`,
+        data: { absenceId: absence._id, classId: absence.class }
+      });
+
+      // Create announcement as well for broader visibility
       await Announcement.create({
         title: 'Class Replacement Assigned',
-        content: `You have been assigned to replace ${absence.teacher.name} for class on ${absence.dateOfAbsence}.`,
+        content: `You have been assigned to replace ${absence.teacher ? absence.teacher.name || absence.teacher : 'the teacher'} for class on ${absence.dateOfAbsence}.`,
         department: absence.department,
         createdBy: req.user._id,
       });
+
+      // Emit socket event to replacement teacher room
+      try {
+        const io = getIO();
+        const room = `user:${replacementTeacher._id}`;
+        io.to(room).emit('replacement_assigned', { absenceId: absence._id, classId: absence.class, date: absence.dateOfAbsence });
+      } catch (e) {
+        console.warn('Socket emit failed for replacement_assigned:', e.message || e);
+      }
     }
 
-    // Notify students
-    await Announcement.create({
-      title: 'Class Teacher Change',
-      content: `The teacher for your class on ${absence.dateOfAbsence} has changed. New teacher: ${replacementTeacher.name}`,
-      department: absence.department,
-      createdBy: req.user._id,
-    });
+    // Notify students (announcement) and emit socket to class students if timetableEntry exists
+    try {
+      const studentsAnnouncement = await Announcement.create({
+        title: 'Class Teacher Change',
+        content: `The teacher for your class on ${absence.dateOfAbsence} has changed. New teacher: ${replacementTeacher ? replacementTeacher.name : 'Assigned teacher'}`,
+        department: absence.department,
+        createdBy: req.user._id,
+      });
+
+      if (timetableEntry && timetableEntry.class) {
+        try {
+          const io = getIO();
+          // If you track enrolled students in a room like `class:<classId>`, emit there; otherwise emit department-wide
+          io.to(`class:${String(timetableEntry.class)}`).emit('timetable_updated', { entryId: timetableEntry._id, replacementTeacher: replacementTeacher ? { _id: replacementTeacher._id, name: replacementTeacher.name } : null });
+        } catch (e) {
+          console.warn('Socket emit failed for timetable_updated:', e.message || e);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to create student announcement for replacement:', e.message || e);
+    }
 
     res.json({ message: 'Replacement assigned successfully.' });
   } catch (error) {

@@ -15,6 +15,16 @@ const announcementSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  targetClass: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    required: false,
+  },
+  targetAudience: {
+    type: String,
+    enum: ['all', 'class', 'specific'],
+    default: 'all'
+  },
   targetRoles: {
     type: [String],
     enum: ['all', 'student', 'teacher', 'HOD', 'admin', 'credit-controller', 'HSSM-provider'],

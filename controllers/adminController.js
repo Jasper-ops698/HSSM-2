@@ -9,8 +9,10 @@ const downloadDepartmentReportCsv = async (req, res) => {
       return res.status(400).json({ message: 'Department is required' });
     }
     // Calculate date range
-    let startDate = start ? new Date(start) : new Date();
-    let endDate = new Date(startDate);
+  // Normalize start/end to UTC midnight boundaries to avoid timezone off-by-one errors
+  let startDateInput = start ? new Date(start) : new Date();
+  let startDate = new Date(Date.UTC(startDateInput.getUTCFullYear(), startDateInput.getUTCMonth(), startDateInput.getUTCDate()));
+  let endDate = new Date(startDate);
     if (period === 'week') {
       endDate.setDate(startDate.getDate() + 7);
     } else if (period === 'month') {
@@ -23,6 +25,7 @@ const downloadDepartmentReportCsv = async (req, res) => {
 
     // Fetch absences for this department and date range
     const Absence = require('../models/Absence');
+    // Use UTC-based range: startDate inclusive to endDate exclusive
     const absences = await Absence.find({
       department,
       dateOfAbsence: { $gte: startDate, $lt: endDate }
@@ -30,6 +33,82 @@ const downloadDepartmentReportCsv = async (req, res) => {
       .populate('teacher', 'name email role')
       .populate('student', 'name email role')
       .populate('class', 'name');
+
+    // Fetch timetable entries (including archived) in the date range for this department
+    const Timetable = require('../models/Timetable');
+    const timetableEntries = await Timetable.find({
+      department,
+      // entries that overlap with the requested range
+      $or: [
+        { startDate: { $gte: startDate, $lt: endDate } },
+        { endDate: { $gte: startDate, $lt: endDate } },
+        { startDate: { $lte: startDate }, endDate: { $gte: endDate } }
+      ]
+    }).populate('teacher', 'name email');
+
+    // For each timetable entry, compute attendance summary by checking Attendance collection for the relevant dates
+    const timetableRows = [];
+    const Attendance = require('../models/Attendance');
+    for (const entry of timetableEntries) {
+      try {
+        // Determine session date range intersection with requested date range
+  // Determine intersection in UTC
+  const sessionStart = entry.startDate && entry.startDate > startDate ? entry.startDate : startDate;
+  const sessionEnd = entry.endDate && entry.endDate < endDate ? entry.endDate : endDate;
+
+        // Count absences for this subject/teacher within the intersection dates
+        // Count absences and presents using Attendance model
+        // Normalize sessionStart/sessionEnd to UTC date boundaries for matching dateOfSession
+        const utcSessionStart = new Date(Date.UTC(sessionStart.getUTCFullYear(), sessionStart.getUTCMonth(), sessionStart.getUTCDate()));
+        const utcSessionEnd = new Date(Date.UTC(sessionEnd.getUTCFullYear(), sessionEnd.getUTCMonth(), sessionEnd.getUTCDate()));
+
+        const attendanceDocs = await Attendance.find({
+          department,
+          class: entry.class || null,
+          dateOfSession: { $gte: utcSessionStart, $lt: utcSessionEnd }
+        }).select('status');
+
+        let absentCount = 0, presentCount = 0, lateCount = 0, excusedCount = 0;
+        attendanceDocs.forEach(a => {
+          if (a.status === 'absent') absentCount++;
+          else if (a.status === 'present') presentCount++;
+          else if (a.status === 'late') lateCount++;
+          else if (a.status === 'excused') excusedCount++;
+        });
+
+        // If no attendance docs, approximate enrolled count as before
+        const ClassModel = require('../models/Class');
+        let enrolledCount = 0;
+        if (entry.subject) {
+          const cls = await ClassModel.findOne({ name: entry.subject, department }).select('enrolledStudents');
+          if (cls && cls.enrolledStudents) enrolledCount = cls.enrolledStudents.length;
+        }
+
+        // If we have attendance docs, use counts; otherwise approximate present via enrolledCount - absent
+        if (attendanceDocs.length === 0) {
+          presentCount = Math.max(0, enrolledCount - absentCount);
+        }
+
+        timetableRows.push({
+          Type: 'TimetableEntry',
+          Subject: entry.subject || '',
+          Teacher: entry.teacher ? entry.teacher.name : '',
+          StartDate: entry.startDate ? entry.startDate.toISOString().slice(0,10) : '',
+          EndDate: entry.endDate ? entry.endDate.toISOString().slice(0,10) : '',
+          DayOfWeek: entry.dayOfWeek || '',
+          StartTime: entry.startTime || '',
+          EndTime: entry.endTime || '',
+          Archived: entry.archived ? 'Yes' : 'No',
+          EnrolledStudents: enrolledCount,
+          AbsentCount: absentCount,
+          PresentCount: presentCount,
+          LateCount: lateCount,
+          ExcusedCount: excusedCount
+        });
+      } catch (e) {
+        console.warn('Error computing timetable attendance for entry', entry._id, e.message || e);
+      }
+    }
 
     // Compose report rows
     const rows = [];
@@ -66,6 +145,8 @@ const downloadDepartmentReportCsv = async (req, res) => {
         Details: `Reason: ${a.reason || ''}, Class: ${a.class && a.class.name ? a.class.name : ''}, Status: ${a.status}`
       });
     });
+  // Append timetable rows to CSV rows
+  timetableRows.forEach(r => rows.push(r));
     // Generate CSV
     const parser = new Parser();
     const csv = parser.parse(rows);

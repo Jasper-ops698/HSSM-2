@@ -166,6 +166,14 @@ exports.respondToEnrollment = async (req, res) => {
       // Notify credit-controllers
       await NotificationService.notifyCreditControllers(student.name, targetClass.name, creditsToDeduct);
 
+        // Emit credit_updated socket event so client's dashboards update immediately
+        try {
+          const io = getIO();
+          io.to(`user:${String(student._id)}`).emit('credit_updated', { userId: String(student._id), credits: student.credits, amount: creditsToDeduct, action: 'deduct' });
+        } catch (emitErr) {
+          console.warn('Failed to emit credit_updated socket event from enrollment approval:', emitErr.message || emitErr);
+        }
+
       targetClass.enrolledStudents.push(student._id);
       await targetClass.save();
 
