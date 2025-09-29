@@ -394,20 +394,45 @@ exports.getStudentTimetable = async (req, res) => {
 // Get timetable for a specific teacher for a given week
 exports.getTeacherTimetable = async (req, res) => {
   try {
-    const teacherId = req.user.id;
-    const teacherDepartment = req.user.department;
-    const { week } = req.query;
+    // Prefer _id (mongoose document) but accept id string as well
+    const teacherId = req.user && (req.user._id || req.user.id || req.user.userId);
+    let teacherDepartment = req.user && req.user.department;
+    let { week } = req.query;
 
-    if (!week) {
-      return res.status(400).json({ message: 'Week number is required.' });
+    // Ensure we have a department; if not, try to fetch from DB (safe fallback)
+    if (!teacherDepartment && teacherId) {
+      try {
+        const teacherUser = await User.findById(teacherId).select('department');
+        if (teacherUser && teacherUser.department) teacherDepartment = teacherUser.department;
+      } catch (e) {
+        // ignore lookup errors and proceed — department may remain undefined
+      }
     }
 
-    // Find timetable entries for this teacher, department, and week
-    const timetable = await Timetable.find({
+    // If week is not provided, try to derive the current week from any timetable entry
+    if (!week) {
+      const today = new Date();
+      const anyEntry = await Timetable.findOne({
+        teacher: teacherId,
+        startDate: { $lte: today },
+        endDate: { $gte: today }
+      });
+      if (anyEntry && anyEntry.week) {
+        week = anyEntry.week;
+      } else {
+        // As a last resort, default to week 1
+        week = 1;
+      }
+    }
+
+    // Find timetable entries for this teacher, department (if available), and week
+    const query = {
       teacher: teacherId,
-      department: teacherDepartment,
       week: parseInt(week, 10)
-    }).populate('teacher', 'name email');
+    };
+    if (teacherDepartment) query.department = teacherDepartment;
+
+    const timetable = await Timetable.find(query).populate('teacher', 'name email');
     // Also populate any replacement teacher info
     timetable.forEach(t => t.populate && t.populate('replacement.teacher', 'name').catch(() => {}));
 
