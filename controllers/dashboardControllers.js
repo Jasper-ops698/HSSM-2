@@ -48,6 +48,10 @@ const getDashboardData = async (req, res) => {
           },
         });
         data.enrollments = enrollments;
+        // Also provide a normalized list of enrolled class IDs as strings to
+        // make it easy for frontend clients to check membership without
+        // depending on populated objects' shape.
+        data.enrolledClassIds = enrollments.map(en => en.class && en.class._id ? String(en.class._id) : null).filter(Boolean);
         data.kpi = {
           credits: student.credits || 0,
           enrolledClasses: enrollments.length,
@@ -58,18 +62,18 @@ const getDashboardData = async (req, res) => {
 
       case 'teacher':
         const classes = await Class.find({ teacher: user._id }).populate('teacher', 'name');
-        
+
         // Get all students enrolled in teacher's classes
         const teacherClassIds = classes.map(c => c._id);
         const enrolledStudents = await Enrollment.find({
           class: { $in: teacherClassIds },
           status: 'Approved'
         }).populate('student', 'name email credits');
-        
+
         // Get unique students
-        const uniqueStudents = [...new Map(enrolledStudents.map(e => 
+        const uniqueStudents = [...new Map(enrolledStudents.map(e =>
           [e.student._id.toString(), e.student])).values()];
-        
+
         data.classes = classes;
         data.students = uniqueStudents;
         data.kpi = {
@@ -188,8 +192,8 @@ const getRelevantAnnouncements = async (user) => {
         { department: user.department }
       ]
     })
-    .sort({ priority: -1, createdAt: -1 })
-    .limit(5);
+      .sort({ priority: -1, createdAt: -1 })
+      .limit(5);
 
     return announcements;
   } catch (error) {

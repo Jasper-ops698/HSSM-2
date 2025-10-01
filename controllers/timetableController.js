@@ -336,24 +336,91 @@ exports.getTimetable = async (req, res) => {
 // Get timetable for a specific student for a given week
 exports.getStudentTimetable = async (req, res) => {
   try {
-    const studentId = req.user.id;
-    const studentDepartment = req.user.department;
-    const { week } = req.query; // Expect week number from query
+      const studentId = req.user.id;
+      const studentDepartment = req.user.department;
+      let { week } = req.query; // Expect week number from query
 
-    if (!week) {
-      return res.status(400).json({ message: 'Week number is required.' });
+      // If week is not provided, attempt to derive the current week based on any
+      // timetable entry that covers today's date. This makes the endpoint more
+      // resilient when frontend and backend may use different term start dates.
+      if (!week) {
+        const today = new Date();
+        try {
+          const anyEntry = await Timetable.findOne({
+            department: studentDepartment,
+            startDate: { $lte: today },
+            endDate: { $gte: today }
+          });
+          if (anyEntry && anyEntry.week) {
+            week = anyEntry.week;
+          } else {
+            // Fall back to week 1 when no matching entry found
+            week = 1;
+          }
+        } catch (e) {
+          // In case of lookup issues, safely default to week 1
+          week = 1;
+        }
+      }
+
+    // Pull department classes for discovery/enrollment cards
+    const departmentClasses = await Class.find({ department: studentDepartment });
+
+    // Identify classes the student is currently enrolled in
+    const enrolledClasses = await Class.find({
+      enrolledStudents: studentId,
+      department: studentDepartment
+    }).select('_id name');
+
+    const enrolledClassIds = enrolledClasses.map(cls => String(cls._id));
+    const enrolledClassNames = enrolledClasses
+      .map(cls => (cls.name || '').trim())
+      .filter(Boolean);
+
+    const weekNumber = parseInt(week, 10);
+
+    let timetable = [];
+    if (enrolledClassNames.length > 0) {
+      timetable = await Timetable.find({
+        department: studentDepartment,
+        week: weekNumber,
+        subject: { $in: enrolledClassNames }
+      })
+        .populate('teacher', 'name email')
+        .populate('replacement.teacher', 'name email')
+        .populate('venue', 'name location');
     }
 
-    // Find all classes in the student's department
-    const departmentClasses = await Class.find({
-      department: studentDepartment
-    });
+    // If a specific week was requested but returned nothing, attempt to derive
+    // the current active week for the student's enrolled subjects
+    if (
+      timetable.length === 0 &&
+      enrolledClassNames.length > 0 &&
+      typeof req.query.week === 'string'
+    ) {
+      const today = new Date();
+      const fallbackEntry = await Timetable.findOne({
+        department: studentDepartment,
+        subject: { $in: enrolledClassNames },
+        startDate: { $lte: today },
+        endDate: { $gte: today }
+      })
+        .populate('teacher', 'name email')
+        .populate('replacement.teacher', 'name email')
+        .populate('venue', 'name location');
 
-    // Find timetable entries for the department and week (all classes, not just enrolled)
-    const timetable = await Timetable.find({
-      department: studentDepartment,
-      week: parseInt(week, 10)
-    }).populate('teacher', 'name email');
+      if (fallbackEntry && fallbackEntry.week && fallbackEntry.week !== weekNumber) {
+        timetable = await Timetable.find({
+          department: studentDepartment,
+          week: fallbackEntry.week,
+          subject: { $in: enrolledClassNames }
+        })
+          .populate('teacher', 'name email')
+          .populate('replacement.teacher', 'name email')
+          .populate('venue', 'name location');
+        week = fallbackEntry.week;
+      }
+    }
 
     // Group by day for better display
     const groupedTimetable = timetable.reduce((acc, entry) => {
@@ -370,19 +437,10 @@ exports.getStudentTimetable = async (req, res) => {
       groupedTimetable[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
     });
 
-    // Find classes the student is enrolled in (for frontend to highlight/enroll logic)
-    // NOTE: Return enrolledClasses as an array of class IDs (strings) for a consistent shape
-    // across clients. Frontend should use these IDs to match against class._id values.
-    const enrolledClasses = await Class.find({
-      enrolledStudents: studentId,
-      department: studentDepartment
-    }).select('_id');
-
     res.json({
       timetable: groupedTimetable,
       departmentClasses,
-      // Return consistent array of string IDs
-      enrolledClasses: enrolledClasses.map(cls => String(cls._id)),
+      enrolledClasses: enrolledClassIds,
       totalEntries: timetable.length,
       week: parseInt(week, 10)
     });
@@ -395,7 +453,8 @@ exports.getStudentTimetable = async (req, res) => {
 exports.getTeacherTimetable = async (req, res) => {
   try {
     // Prefer _id (mongoose document) but accept id string as well
-    const teacherId = req.user && (req.user._id || req.user.id || req.user.userId);
+  const teacherId = req.user && (req.user._id || req.user.id || req.user.userId);
+  const teacherIdStr = teacherId ? String(teacherId) : '';
     let teacherDepartment = req.user && req.user.department;
     let { week } = req.query;
 
@@ -413,7 +472,10 @@ exports.getTeacherTimetable = async (req, res) => {
     if (!week) {
       const today = new Date();
       const anyEntry = await Timetable.findOne({
-        teacher: teacherId,
+        $or: [
+          { teacher: teacherId },
+          { 'replacement.teacher': teacherId }
+        ],
         startDate: { $lte: today },
         endDate: { $gte: today }
       });
@@ -425,16 +487,41 @@ exports.getTeacherTimetable = async (req, res) => {
       }
     }
 
-    // Find timetable entries for this teacher, department (if available), and week
-    const query = {
-      teacher: teacherId,
-      week: parseInt(week, 10)
-    };
-    if (teacherDepartment) query.department = teacherDepartment;
+    const weekNumber = parseInt(week, 10);
 
-    const timetable = await Timetable.find(query).populate('teacher', 'name email');
-    // Also populate any replacement teacher info
-    timetable.forEach(t => t.populate && t.populate('replacement.teacher', 'name').catch(() => {}));
+    const primaryCondition = teacherDepartment
+      ? { teacher: teacherId, department: teacherDepartment }
+      : { teacher: teacherId };
+
+    const query = {
+      week: weekNumber,
+      $or: [
+        primaryCondition,
+        { 'replacement.teacher': teacherId }
+      ]
+    };
+
+    const timetableDocs = await Timetable.find(query)
+      .populate('teacher', 'name email')
+      .populate('replacement.teacher', 'name email')
+      .populate('venue', 'name location');
+
+    // Remove potential duplicates
+    const uniqueMap = new Map();
+    timetableDocs.forEach(doc => {
+      uniqueMap.set(String(doc._id), doc);
+    });
+
+    const timetable = Array.from(uniqueMap.values()).map(doc => {
+      const obj = doc.toObject();
+      const teacherObj = obj.teacher;
+      const replacementTeacher = obj.replacement && obj.replacement.teacher;
+      const teacherObjId = teacherObj && (teacherObj._id || teacherObj);
+      const replacementTeacherId = replacementTeacher && (replacementTeacher._id || replacementTeacher);
+      obj.isPrimaryAssignment = String(teacherObjId || '') === teacherIdStr;
+      obj.isReplacementAssignment = String(replacementTeacherId || '') === teacherIdStr && !obj.isPrimaryAssignment;
+      return obj;
+    });
 
     // Group by day for better display
     const groupedTimetable = timetable.reduce((acc, entry) => {
@@ -454,7 +541,7 @@ exports.getTeacherTimetable = async (req, res) => {
     res.json({
       timetable: groupedTimetable,
       totalEntries: timetable.length,
-      week: parseInt(week, 10)
+      week: weekNumber
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch teacher timetable.' });
@@ -500,12 +587,10 @@ exports.getTodayTimetable = async (req, res) => {
       subject: { $in: enrolledSubjects },
       dayOfWeek: dayOfWeek,
       week: currentWeek
-    }).populate('teacher', 'name email');
-
-    // Populate replacement teacher where present
-    for (const tt of todayTimetable) {
-      try { await tt.populate('replacement.teacher', 'name'); } catch (e) { /* ignore */ }
-    }
+    })
+      .populate('teacher', 'name email')
+      .populate('replacement.teacher', 'name email')
+      .populate('venue', 'name location');
 
     // Sort by start time
     todayTimetable.sort((a, b) => a.startTime.localeCompare(b.startTime));

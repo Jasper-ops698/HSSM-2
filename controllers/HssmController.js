@@ -12,18 +12,21 @@ const sanitizeInput = (input) => {
 // --- Incident Controllers ---
 const createIncident = async (req, res, next) => {
   try {
-    const { department, title, priority, description, date } = req.body;
-    const file = req.file ? req.file.filename : null;
-    if (!department || !title || !priority || !date) {
-      return res.status(400).json({ message: 'Missing required fields: department, title, priority, date' });
+    const { department, title, priority, description, date, userId } = req.body;
+    const derivedUserId = req.user?.id || userId;
+    if (!department || !title || !priority || !date || !derivedUserId) {
+      return res.status(400).json({ message: 'Missing required fields: department, title, priority, date, userId' });
     }
+
+    const file = req.file ? req.file.filename : null;
     const newIncident = new Incident({
       department: sanitizeInput(department),
       title: sanitizeInput(title),
       priority: sanitizeInput(priority),
-      description: sanitizeInput(description),
+      description: description ? sanitizeInput(description) : undefined,
       date: new Date(date),
       file,
+      userId: derivedUserId,
     });
     await newIncident.save();
     res.status(201).json(newIncident);
@@ -44,12 +47,22 @@ const getAllIncidents = async (req, res, next) => {
 // --- Asset Controllers ---
 const createAsset = async (req, res, next) => {
   try {
-    const { name, serialNumber, category, location, serviceRecords, facilityLevel } = req.body;
-    const file = req.file ? req.file.filename : null;
-    if (!name || !serialNumber || !category || !location || !facilityLevel) {
-      return res.status(400).json({ message: 'Missing required fields: name, serialNumber, category, location, facilityLevel' });
+    const { name, serialNumber, category, location, serviceRecords, userId } = req.body;
+    const derivedUserId = req.user?.id || userId;
+    if (!name || !serialNumber || !category || !location || !derivedUserId) {
+      return res.status(400).json({ message: 'Missing required fields: name, serialNumber, category, location, userId' });
     }
-    const newAsset = new Asset({ name, serialNumber, category, location, serviceRecords, facilityLevel, file });
+
+    const file = req.file ? req.file.filename : null;
+    const newAsset = new Asset({
+      name: sanitizeInput(name),
+      serialNumber: typeof serialNumber === 'string' ? sanitizeInput(serialNumber) : serialNumber,
+      category: sanitizeInput(category),
+      location: sanitizeInput(location),
+      serviceRecords: serviceRecords ? sanitizeInput(serviceRecords) : undefined,
+      file,
+      userId: derivedUserId,
+    });
     await newAsset.save();
     res.status(201).json(newAsset);
   } catch (err) {
@@ -69,11 +82,36 @@ const getAllAssets = async (req, res, next) => {
 // --- Task Controllers ---
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, assignedTo, dueDate, priority } = req.body;
-    if (!title || !assignedTo || !dueDate || !priority) {
-      return res.status(400).json({ message: 'Missing required fields: title, assignedTo, dueDate, priority' });
+    const {
+      task,
+      assignedTo,
+      id,
+      dueDate,
+      priority = 'Medium',
+      taskDescription,
+      taskdescription,
+      status,
+      userId,
+    } = req.body;
+    const derivedUserId = req.user?.id || userId;
+    if (!task || !assignedTo || !dueDate || !priority || !id || !derivedUserId) {
+      return res.status(400).json({ message: 'Missing required fields: task, assignedTo, id, dueDate, priority, userId' });
     }
-    const newTask = new Task({ title, description, assignedTo, dueDate, priority });
+
+    const descriptionValue = taskDescription || taskdescription;
+    const file = req.file ? req.file.filename : null;
+
+    const newTask = new Task({
+      task: sanitizeInput(task),
+      assignedTo: sanitizeInput(assignedTo),
+      id,
+      dueDate: new Date(dueDate),
+      priority: sanitizeInput(priority),
+      status: status ? sanitizeInput(status) : undefined,
+      taskDescription: descriptionValue ? sanitizeInput(descriptionValue) : undefined,
+      file,
+      userId: derivedUserId,
+    });
     await newTask.save();
     res.status(201).json(newTask);
   } catch (err) {
@@ -93,11 +131,43 @@ const getAllTasks = async (req, res, next) => {
 // --- Meter Reading Controllers ---
 const createMeterReading = async (req, res, next) => {
   try {
-    const { reading, unit, date } = req.body;
-    if (!reading || !unit || !date) {
-      return res.status(400).json({ message: 'Missing required fields: reading, unit, date' });
+    const { location, realPower_kW, apparentPower_kVA, date } = req.body;
+    const userId = req.user.id;
+
+    // --- Input Validation ---
+    if (!location || !realPower_kW || !apparentPower_kVA || !date) {
+      return res.status(400).json({ message: 'Missing required fields: location, Real Power (kW), Apparent Power (kVA), and date.' });
     }
-    const newReading = new MeterReading({ reading, unit, date });
+
+    const realPower = parseFloat(realPower_kW);
+    const apparentPower = parseFloat(apparentPower_kVA);
+
+    if (isNaN(realPower) || isNaN(apparentPower)) {
+        return res.status(400).json({ message: 'Real Power and Apparent Power must be valid numbers.' });
+    }
+    if (apparentPower <= 0) {
+        return res.status(400).json({ message: 'Apparent Power (kVA) must be greater than zero.' });
+    }
+    if (realPower > apparentPower) {
+        return res.status(400).json({ message: 'Real Power (kW) cannot be greater than Apparent Power (kVA).' });
+    }
+    if (realPower < 0 || apparentPower < 0) {
+        return res.status(400).json({ message: 'Power values cannot be negative.' });
+    }
+
+    // --- Power Factor Calculation ---
+    const rawPowerFactor = realPower / apparentPower;
+    const powerFactor = Math.min(1, Math.max(0, Number(rawPowerFactor.toFixed(4))));
+
+    const newReading = new MeterReading({
+      location: sanitizeInput(location),
+      realPower_kW: realPower,
+      apparentPower_kVA: apparentPower,
+      powerFactor,
+      date: new Date(date),
+      userId
+    });
+
     await newReading.save();
     res.status(201).json(newReading);
   } catch (err) {

@@ -89,14 +89,29 @@ const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 400 });
 // app.use(globalLimiter); // Uncomment if you want a global fallback
 
 // Stricter limiter for frequently-called endpoints (e.g., dashboard polling)
+// Allow the limit to be controlled via DASHBOARD_RATE_LIMIT env var. In development
+// default to a much higher limit to avoid accidental 429s while working locally.
+const dashboardWindowMs = 15 * 60 * 1000; // 15 minutes
+let dashboardMax = 60; // default for production
+if (process.env.DASHBOARD_RATE_LIMIT) {
+  const parsed = parseInt(process.env.DASHBOARD_RATE_LIMIT, 10);
+  if (!isNaN(parsed) && parsed > 0) dashboardMax = parsed;
+} else if (process.env.NODE_ENV !== 'production') {
+  // Relax limits for local development to avoid blocking rapid reloads
+  dashboardMax = 1000;
+}
+
 const dashboardLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 60, // 60 requests per 15 minutes (1 per 15 seconds on average)
+  windowMs: dashboardWindowMs,
+  max: dashboardMax,
   message: 'Too many dashboard requests, please slow down.',
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the deprecated `X-RateLimit-*` headers
-  // If a client exceeds the limit, express-rate-limit will include a Retry-After header
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`Dashboard rate limiter configured: max=${dashboardMax} per ${dashboardWindowMs}ms`);
+}
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {

@@ -37,17 +37,19 @@ class PDFService {
         // Summary Statistics
         doc.fontSize(16).text('Summary Statistics');
         doc.moveDown();
+        const enrolledClassesSafe = Array.isArray(analysisData.enrolledClasses) ? analysisData.enrolledClasses : [];
+        const totalAbsences = enrolledClassesSafe.reduce((sum, cls) => sum + (cls.totalAbsences || 0), 0);
         doc.fontSize(12)
           .text(`Total Classes Enrolled: ${analysisData.summary.totalEnrolled}`)
           .text(`Overall Attendance Percentage: ${analysisData.summary.overallAttendancePercentage}%`)
-          .text(`Total Absences: ${analysisData.enrolledClasses.reduce((sum, cls) => sum + cls.totalAbsences, 0)}`);
+          .text(`Total Absences: ${totalAbsences}`);
         doc.moveDown();
 
         // Class Details
         doc.fontSize(16).text('Class Details');
         doc.moveDown();
 
-        analysisData.enrolledClasses.forEach((classInfo, index) => {
+        (Array.isArray(analysisData.enrolledClasses) ? analysisData.enrolledClasses : []).forEach((classInfo, index) => {
           doc.fontSize(14).text(`${index + 1}. ${classInfo.className}`);
           doc.fontSize(12)
             .text(`   Teacher: ${classInfo.teacher?.name || 'N/A'}`)
@@ -134,7 +136,7 @@ class PDFService {
             .text(`   Classes Enrolled: ${student.summary.totalEnrolled}`)
             .text(`   Overall Attendance: ${student.summary.overallAttendancePercentage}%`)
             .text(`   Status: ${student.summary.overallAttendancePercentage >= 90 ? 'Excellent' :
-                           student.summary.overallAttendancePercentage >= 70 ? 'Good' : 'Needs Improvement'}`);
+              student.summary.overallAttendancePercentage >= 70 ? 'Good' : 'Needs Improvement'}`);
           doc.moveDown();
         });
 

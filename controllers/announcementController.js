@@ -1,46 +1,178 @@
+const Announcement = require('../models/Announcement');
+
+const ALLOWED_TARGET_ROLES = ['student', 'teacher', 'HOD', 'admin', 'credit-controller', 'HSSM-provider'];
+const ALLOWED_TARGET_SCOPES = ['department', 'global'];
+
+const normalizeTargeting = (user, payload = {}, existing = {}) => {
+  const rawRolesSource = payload.targetRoles !== undefined ? payload.targetRoles : existing.targetRoles;
+  const rolesArray = Array.isArray(rawRolesSource)
+    ? rawRolesSource
+    : rawRolesSource
+      ? [rawRolesSource]
+      : [];
+  const normalizedRoles = rolesArray
+    .map(role => (typeof role === 'string' ? role.trim() : role))
+    .filter(Boolean);
+
+  if (!normalizedRoles.length) {
+    return { error: 'A target group is required.', status: 400 };
+  }
+
+  if (normalizedRoles.length !== 1) {
+    return { error: 'Select exactly one target group.', status: 400 };
+  }
+
+  const targetRole = normalizedRoles[0];
+
+  if (!ALLOWED_TARGET_ROLES.includes(targetRole)) {
+    return { error: 'Invalid target group specified.', status: 400 };
+  }
+
+  if (targetRole === 'admin' && user.role !== 'admin') {
+    return { error: 'Only administrators can target admins.', status: 403 };
+  }
+
+  if (targetRole === 'HOD' && !['admin', 'HOD'].includes(user.role)) {
+    return { error: 'Only administrators or HODs can target HODs.', status: 403 };
+  }
+
+  if (user.role === 'teacher' && ['HOD', 'admin'].includes(targetRole)) {
+    return { error: 'Teachers cannot target that audience.', status: 403 };
+  }
+
+  if (['credit-controller', 'HSSM-provider'].includes(targetRole) && user.role !== 'admin') {
+    return { error: 'Only administrators can target that audience.', status: 403 };
+  }
+
+  let targetScope = payload.targetScope !== undefined
+    ? payload.targetScope
+    : existing.targetScope;
+
+  if (!ALLOWED_TARGET_SCOPES.includes(targetScope)) {
+    targetScope = targetRole === 'HOD' ? 'global' : 'department';
+  }
+
+  if (targetScope === 'global' && !['admin', 'HOD'].includes(user.role)) {
+    return { error: 'Only administrators or HODs can broadcast globally.', status: 403 };
+  }
+
+  if (targetRole === 'HOD' && targetScope !== 'global') {
+    return { error: 'Announcements for HODs must target all HODs.', status: 400 };
+  }
+
+  if (targetRole === 'admin' && targetScope !== 'global') {
+    return { error: 'Announcements for admins must target all admins.', status: 400 };
+  }
+
+  if (['credit-controller', 'HSSM-provider'].includes(targetRole)) {
+    targetScope = 'global';
+  }
+
+  let department = payload.department !== undefined
+    ? payload.department
+    : existing.department;
+
+  if (targetScope === 'department') {
+    department = department || user.department;
+    if (!department) {
+      return { error: 'Department is required for department-scoped announcements.', status: 400 };
+    }
+  } else {
+    department = null;
+  }
+
+  return {
+    targetRoles: [targetRole],
+    targetScope,
+    department
+  };
+};
+
+const buildAudienceFilters = (user) => {
+  if (!user || user.role === 'admin') {
+    return [];
+  }
+
+  const filters = [];
+  const roleFilter = {
+    $or: [
+      { targetRoles: 'all' },
+      { targetRoles: user.role }
+    ]
+  };
+
+  const scopeConditions = [{ targetScope: 'global' }];
+
+  if (user.department) {
+    scopeConditions.push({
+      $and: [
+        { $or: [{ targetScope: 'department' }, { targetScope: { $exists: false } }] },
+        { department: user.department }
+      ]
+    });
+
+    scopeConditions.push({
+      $and: [
+        { targetScope: { $exists: false } },
+        { department: user.department }
+      ]
+    });
+  }
+
+  scopeConditions.push({
+    $and: [
+      { targetScope: { $exists: false } },
+      { $or: [{ department: { $exists: false } }, { department: null }] }
+    ]
+  });
+
+  filters.push(roleFilter);
+  filters.push({ $or: scopeConditions });
+
+  return filters;
+};
+
 // @desc    Mark all announcements as read for the current student (soft delete)
 // @route   PATCH /api/announcements/mark-all-read
 // @access  Private (Student)
 exports.markAllAnnouncementsAsRead = async (req, res) => {
   try {
-    // Only students can use this endpoint
     if (req.user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can mark all announcements as read.' });
     }
-    // Find all announcements visible to this student
+
     const userId = req.user._id;
     const currentDate = new Date();
+
+    const andConditions = [
+      { startDate: { $lte: currentDate } },
+      { $or: [{ endDate: null }, { endDate: { $gte: currentDate } }] },
+      ...buildAudienceFilters(req.user)
+    ];
+
     const query = {
       active: true,
-      $and: [
-        { startDate: { $lte: currentDate } },
-        { $or: [{ endDate: null }, { endDate: { $gte: currentDate } }] }
-      ],
-      $or: [
-        { targetRoles: 'all' },
-        { targetRoles: req.user.role },
-        { department: req.user.department }
-      ]
+      ...(andConditions.length ? { $and: andConditions } : {})
     };
-    // Update all matching announcements to add this student's ID to readBy
+
     await Announcement.updateMany(
       query,
       { $addToSet: { readBy: userId } }
     );
+
     res.status(200).json({ message: 'All announcements marked as read for this student.' });
   } catch (error) {
     console.error('Error marking all announcements as read:', error);
     res.status(500).json({ message: 'Server error while marking announcements as read.' });
   }
 };
-const Announcement = require('../models/Announcement');
 
 // @desc    Create a new announcement
 // @route   POST /api/announcements
 // @access  Private (Admin, HOD, Teacher)
 exports.createAnnouncement = async (req, res) => {
   try {
-  const { title, message, content, department, targetRoles, priority, startDate, endDate, isActive, active, targetClass, targetAudience } = req.body;
+    const { title, message, content, department, targetRoles, priority, startDate, endDate, isActive, active, targetClass, targetAudience, targetScope } = req.body;
     
     // Handle field name differences (frontend uses 'content', backend uses 'message')
     const announcementMessage = message || content;
@@ -50,12 +182,22 @@ exports.createAnnouncement = async (req, res) => {
       return res.status(400).json({ message: 'Title and message are required' });
     }
 
+    const targeting = normalizeTargeting(
+      req.user,
+      { targetRoles, targetScope, department }
+    );
+
+    if (targeting.error) {
+      return res.status(targeting.status).json({ message: targeting.error });
+    }
+
     // Create announcement
     const announcement = new Announcement({
       title,
       message: announcementMessage,
-      department: department || req.user.department,
-      targetRoles: targetRoles || (req.user.role === 'admin' ? ['admin', 'HOD', 'teacher'] : ['all']),
+      department: targeting.department,
+      targetRoles: targeting.targetRoles,
+      targetScope: targeting.targetScope,
       targetClass: targetClass || undefined,
       targetAudience: targetAudience || 'all',
       createdBy: req.user._id,
@@ -78,54 +220,51 @@ exports.createAnnouncement = async (req, res) => {
 // @access  Private
 exports.getAnnouncements = async (req, res) => {
   try {
-    const { active, priority, department, role } = req.query;
-    
-    // Build query based on filters
+    const { active, priority, department, targetScope } = req.query;
+
     const query = {};
-    
-    // Active filter (default to true)
-    query.active = active === 'false' ? false : true;
-    
-    // Priority filter
+    const andConditions = [];
+
+    if (req.user.role !== 'admin') {
+      const audienceFilters = buildAudienceFilters(req.user);
+      if (audienceFilters.length) {
+        andConditions.push(...audienceFilters);
+      }
+      query.active = active === 'false' ? false : true;
+    } else {
+      if (active === 'false') {
+        query.active = false;
+      } else if (active === 'all') {
+        // no active filter
+      } else {
+        query.active = true;
+      }
+    }
+
     if (priority && ['low', 'medium', 'high'].includes(priority)) {
       query.priority = priority;
     }
-    
-    // Department filter (for department-specific announcements)
-    if (department) {
+
+    if (department && req.user.role === 'admin') {
       query.department = department;
     }
-    
-    // Filter announcements based on the user's role
-    const userRole = req.user.role;
-    const userDepartment = req.user.department;
-    
-    // Complex query to get:
-    // 1. Announcements targeted to all roles
-    // 2. Announcements targeted to the user's specific role
-    // 3. Announcements for the user's department (if applicable)
-    query.$or = [
-      { targetRoles: 'all' },
-      { targetRoles: userRole }
-    ];
-    
-    // Add department filter if the user has a department
-    if (userDepartment) {
-      query.$or.push({ department: userDepartment });
-    }
-    
-    // Date-based filtering
-    const currentDate = new Date();
-    query.$and = [
-      { startDate: { $lte: currentDate } },
-      { $or: [{ endDate: null }, { endDate: { $gte: currentDate } }] }
-    ];
 
-    // Execute query with sorting (newer first)
+    if (targetScope && ALLOWED_TARGET_SCOPES.includes(targetScope)) {
+      query.targetScope = targetScope;
+    }
+
+    const currentDate = new Date();
+    andConditions.push({ startDate: { $lte: currentDate } });
+    andConditions.push({ $or: [{ endDate: null }, { endDate: { $gte: currentDate } }] });
+
+    if (andConditions.length) {
+      query.$and = andConditions;
+    }
+
     const announcements = await Announcement.find(query)
       .populate('createdBy', 'name role department')
       .sort({ priority: -1, createdAt: -1 });
-    
+
     res.status(200).json(announcements);
   } catch (error) {
     console.error('Error fetching announcements:', error);
@@ -179,12 +318,31 @@ exports.updateAnnouncement = async (req, res) => {
     if (updates.content !== undefined) {
       announcement.message = updates.content;
     }
+    if (updates.message !== undefined) {
+      announcement.message = updates.message;
+    }
     if (updates.isActive !== undefined) {
       announcement.active = updates.isActive;
     }
-    
-    // Update fields
-    const allowedUpdates = ['title', 'message', 'active', 'priority', 'targetRoles', 'endDate'];
+
+    const targetingFields = ['targetRoles', 'targetScope', 'department'].some(field => updates[field] !== undefined);
+    if (targetingFields) {
+      const targeting = normalizeTargeting(req.user, updates, {
+        targetRoles: announcement.targetRoles,
+        targetScope: announcement.targetScope || (announcement.department ? 'department' : 'global'),
+        department: announcement.department
+      });
+
+      if (targeting.error) {
+        return res.status(targeting.status).json({ message: targeting.error });
+      }
+
+      announcement.targetRoles = targeting.targetRoles;
+      announcement.targetScope = targeting.targetScope;
+      announcement.department = targeting.department;
+    }
+
+    const allowedUpdates = ['title', 'active', 'priority', 'endDate', 'startDate'];
     allowedUpdates.forEach(field => {
       if (updates[field] !== undefined) {
         announcement[field] = updates[field];

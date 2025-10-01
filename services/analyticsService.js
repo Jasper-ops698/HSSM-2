@@ -41,24 +41,23 @@ async function analyzeStudentInteraction(studentId) {
     const absences = await Absence.find({ student: studentId }).lean();
     const absenceClassIds = new Set(absences.map(a => a.class.toString()));
 
-    // 3. Calculate attendance for each class
+    // 3. Calculate attendance for each class. Normalize class IDs to strings and
+    // avoid depending on populated objects downstream.
     const enrolledClasses = enrollments.map(enrollment => {
-      const classInfo = enrollment.class;
-      const totalAbsences = absences.filter(a => a.class.toString() === classInfo._id.toString()).length;
-      
-      // This is a simplified assumption. A real-world scenario would need total class sessions.
-      // For now, we'll assume a fixed number of sessions per class for calculation, e.g., 30.
-      const totalSessions = 30; 
+      const classInfo = enrollment.class || {};
+      const classIdStr = classInfo._id ? String(classInfo._id) : String(classInfo);
+      const totalAbsences = absences.filter(a => a.class && String(a.class) === classIdStr).length;
+      // Simplified sessions assumption
+      const totalSessions = 30;
       const attendance = Math.max(0, totalSessions - totalAbsences);
       const attendancePercentage = (attendance / totalSessions) * 100;
 
       return {
-        className: classInfo.name,
-        classId: classInfo._id,
-        teacher: classInfo.teacher,
+        className: classInfo.name || 'Unknown',
+        classId: classIdStr,
+        teacher: classInfo.teacher || null,
         totalAbsences,
         attendancePercentage: parseFloat(attendancePercentage.toFixed(2)),
-        // We can add more details here, like when attendance was last marked.
       };
     });
 

@@ -111,10 +111,12 @@ const assetSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 });
 
-// Define meterReading schema with flattened structure and userId
+// Define meterReading schema for power factor calculation
 const meterReadingSchema = new mongoose.Schema({
     location: { type: String, required: true },
-    reading: { type: Number, required: true },
+    realPower_kW: { type: Number, required: true }, // Real Power in kilowatts
+    apparentPower_kVA: { type: Number, required: true }, // Apparent Power in kilovolt-amperes
+    powerFactor: { type: Number, required: true, min: 0, max: 1 }, // Calculated power factor
     date: { type: Date, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 });

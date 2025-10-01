@@ -28,7 +28,12 @@ const announcementSchema = new mongoose.Schema({
   targetRoles: {
     type: [String],
     enum: ['all', 'student', 'teacher', 'HOD', 'admin', 'credit-controller', 'HSSM-provider'],
-    default: ['all']
+    default: ['student']
+  },
+  targetScope: {
+    type: String,
+    enum: ['department', 'global'],
+    default: 'department'
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
