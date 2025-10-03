@@ -169,33 +169,44 @@ connectToDatabase()
       });
     });
 
-    // --- API Route Middleware ---
-  app.use("/api/auth", authRoutes);
-  app.use("/api/enrollments", enrollmentRoutes);
-  app.use("/api/classes", classRoutes);
-  // Apply stricter limiter to dashboard endpoints
-  app.use("/api/dashboard", dashboardLimiter, dashboardRoutes);
-    app.use('/api/bookings', bookingRoutes);
-    app.use('/api/venues', venueRoutes);
-    app.use('/api/absence', absenceRoutes);
-    app.use('/api/admin', adminRoutes);
-    app.use('/api/ai', aiRoutes);
-    app.use('/api/announcements', announcementRoutes);
-    app.use('/api/credits', creditRoutes);
-    app.use('/api/auth/google', googleAuthRoutes);
-    app.use('/api/hod', hodRoutes);
-    app.use('/api/hssm-dashboard', hssmDashboardRoutes);
-    app.use('/api/hssm-provider', hssmProviderRoutes);
-    app.use('/api/hssm', HssmRoutes);
-    app.use('/api/notifications', notificationRoutes);
-    app.use('/api/reports', reportRoutes);
-    app.use('/api/student', studentRoutes);
-    app.use('/api/teacher', teacherRoutes);
-    app.use('/api/timetable', timetableRoutes);
-    app.use('/api/twofa', twofaRoutes);
-    app.use('/api/services', serviceRoutes);
+const notificationRoutes = require('../routes/notificationRoutes');
+const reportRoutes = require('../routes/reportRoutes');
+const requestRoutes = require('../routes/requestRoutes');
+const serviceRoutes = require('../routes/serviceRoutes');
+const studentRoutes = require('../routes/studentRoutes');
+const teacherRoutes = require('../routes/teacherRoutes');
+const timetableRoutes = require('../routes/timetableRoutes');
+const twofaRoutes = require('../routes/twofaRoutes');
+const venueRoutes = require('../routes/venueRoutes');
 
-    // Serve uploaded files statically
+// ... (other route imports)
+
+// --- API Routes ---
+app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/classes', classRoutes);
+app.use('/api/credits', creditRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/hod', hodRoutes);
+app.use('/api/hssm', HssmRoutes);
+app.use('/api/hssm-dashboard', hssmDashboardRoutes);
+app.use('/api/hssm-providers', hssmProviderRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/timetables', timetableRoutes);
+app.use('/api/2fa', twofaRoutes);
+app.use('/api/venues', venueRoutes);
+app.use('/api/absences', absenceRoutes);
+app.use('/auth/google', googleAuthRoutes);    // Serve uploaded files statically
     app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
     // --- Default Route ---

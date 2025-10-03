@@ -1,4 +1,6 @@
 const Notification = require('../models/Notification');
+const { NotificationHubsClient } = require("@azure/notification-hubs");
+const { notificationHub } = require("../config/config");
 
 const getNotifications = async (req, res) => {
   try {
@@ -69,6 +71,33 @@ const deleteAllNotifications = async (req, res) => {
   } catch (error) {
     console.error('Error deleting all notifications:', error);
     res.status(500).json({ msg: 'Server error' });
+  }
+};
+
+exports.registerDevice = async (req, res) => {
+  const { token, userId, platform } = req.body; // platform can be 'fcm', 'apns', etc.
+
+  if (!token || !userId || !platform) {
+    return res.status(400).json({ message: "Token, userId, and platform are required." });
+  }
+
+  try {
+    const client = new NotificationHubsClient(notificationHub.connectionString, notificationHub.hubName);
+
+    const installationId = `${userId}-${token}`;
+    const installation = {
+      installationId: installationId,
+      pushChannel: token,
+      platform: platform,
+      tags: [`user_${userId}`],
+    };
+
+    await client.createOrUpdateInstallation(installation);
+
+    res.status(200).json({ message: "Device registered successfully." });
+  } catch (error) {
+    console.error("Error registering device:", error);
+    res.status(500).json({ message: "Failed to register device." });
   }
 };
 

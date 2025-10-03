@@ -1,3 +1,5 @@
+const { NotificationHubsClient } = require("@azure/notification-hubs");
+const { notificationHub } = require("../config/config");
 const Enrollment = require('../models/Enrollment');
 const Class = require('../models/Class');
 const User = require('../models/User');
@@ -84,53 +86,57 @@ exports.requestEnrollment = async (req, res) => {
     const teacher = await User.findById(targetClass.teacher);
     const hod = await User.findById(targetClass.HOD);
 
-    // Emit a socket event so connected clients (teacher/student dashboards) can update in real-time
-    try {
-      const io = getIO();
-      const payload = {
-        studentId: String(studentId),
-        classId: String(classId),
-        enrollmentId: newEnrollment._id,
-        status: 'Pending',
-        studentName: student.name,
-        className: targetClass.name,
-      };
-      // Emit to the student room so the student's clients can reconcile (if needed)
-      io.to(`user:${String(studentId)}`).emit('enrollment_requested', payload);
-      // Notify the teacher and HOD if they are present
-      if (teacher && teacher._id) io.to(`user:${String(teacher._id)}`).emit('enrollment_requested', payload);
-      if (hod && hod._id) io.to(`user:${String(hod._id)}`).emit('enrollment_requested', payload);
-    } catch (emitErr) {
-      // Socket might not be initialized in some environments (e.g., tests); don't fail the request because of emit errors
-      console.warn('Failed to emit enrollment_requested socket event:', emitErr.message || emitErr);
+    // --- Send Notifications ---
+    const notificationMessage = `New enrollment request for ${targetClass.name} from ${student.name}.`;
+
+    // 1. Create notifications in the database
+    if (teacher) {
+      await NotificationService.createNotification(teacher._id, 'New Enrollment Request', notificationMessage, { classId, studentId });
+    }
+    if (hod) {
+      await NotificationService.createNotification(hod._id, 'New Enrollment Request', notificationMessage, { classId, studentId });
     }
 
-    const recipients = [];
-    if (teacher?.deviceToken) recipients.push(teacher);
-    if (hod?.deviceToken) recipients.push(hod);
-
-    for (const recipient of recipients) {
-      const notificationMessage = {
-        notification: {
-          title: 'New Enrollment Request',
-          body: `${student.name} has requested to enroll in ${targetClass.name}.`,
+    // 2. Send push notifications via Azure
+    if (notificationHub.connectionString && notificationHub.hubName) {
+      const client = new NotificationHubsClient(notificationHub.connectionString, notificationHub.hubName);
+      const notificationPayload = {
+        body: `{"aps":{"alert":"${notificationMessage}"}}`,
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
         },
-        token: recipient.deviceToken,
       };
-      await sendAzureNotification(notificationMessage);
-      await Notification.create({
-        recipient: recipient._id,
-        type: 'enrollment_approved',
-        title: 'New Enrollment Request',
-        message: `${student.name} has requested to enroll in ${targetClass.name}.`,
-        data: { enrollmentId: newEnrollment._id },
-      });
+      const tags = [];
+      if (teacher) tags.push(`user_${teacher._id}`);
+      if (hod) tags.push(`user_${hod._id}`);
+      if (tags.length > 0) {
+        await client.sendNotification(notificationPayload, { tags });
+      }
     }
 
-    res.status(201).json({ message: 'Enrollment request submitted successfully.', enrollment: newEnrollment });
+    // --- Emit Socket Events ---
+    const io = getIO();
+    const payload = {
+      studentId: String(studentId),
+      classId: String(classId),
+      enrollmentId: newEnrollment._id,
+      status: 'Pending',
+      studentName: student.name,
+      className: targetClass.name,
+    };
+    io.to(String(studentId)).emit('enrollment_status_updated', payload);
+    if (teacher) {
+      io.to(String(teacher._id)).emit('new_enrollment_request', payload);
+    }
+    if (hod) {
+      io.to(String(hod._id)).emit('new_enrollment_request', payload);
+    }
+
+    res.status(201).json({ message: 'Enrollment request sent successfully.', enrollment: newEnrollment });
   } catch (error) {
     console.error('Error requesting enrollment:', error);
-    res.status(500).json({ message: 'Server error during enrollment request.' });
+    res.status(500).json({ message: 'Failed to send enrollment request.' });
   }
 };
 

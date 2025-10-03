@@ -18,7 +18,6 @@ router.put('/mark-read', protect, markNotificationsAsRead);
 // @access  Private
 router.put('/mark-all-read', protect, markAllNotificationsAsRead);
 
-
 // @route   DELETE /api/notifications/:id
 // @desc    Delete a single notification by ID (for the current user)
 // @access  Private
@@ -28,5 +27,8 @@ router.delete('/:id', protect, deleteNotification);
 // @desc    Delete all notifications for the current user
 // @access  Private
 router.delete('/', protect, deleteAllNotifications);
+
+// Route to register a device for push notifications
+router.post('/register-device', authMiddleware, notificationController.registerDevice);
 
 module.exports = router;
