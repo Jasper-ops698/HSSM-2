@@ -4,6 +4,7 @@ const Timetable = require('../models/Timetable');
 const Announcement = require('../models/Announcement');
 const Notification = require('../models/Notification');
 const { getIO } = require('../src/socket');
+const sendAzureNotification = require('../utils/sendAzureNotification');
 
 // Get a single absence by ID
 exports.getAbsenceById = async (req, res) => {

@@ -2,7 +2,7 @@ const Enrollment = require('../models/Enrollment');
 const Class = require('../models/Class');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const sendFCMNotification = require('../utils/sendFCMNotification');
+const sendAzureNotification = require('../utils/sendAzureNotification');
 const NotificationService = require('../services/notificationService');
 // Socket helper to emit real-time events
 const { getIO } = require('../src/socket');
@@ -53,7 +53,7 @@ exports.requestEnrollment = async (req, res) => {
           },
           token: recipient.deviceToken,
         };
-        await sendFCMNotification(notificationMessage);
+        await sendAzureNotification(notificationMessage);
         await Notification.create({
           recipient: recipient._id,
           type: 'enrollment_rejected',
@@ -117,7 +117,7 @@ exports.requestEnrollment = async (req, res) => {
         },
         token: recipient.deviceToken,
       };
-      await sendFCMNotification(notificationMessage);
+      await sendAzureNotification(notificationMessage);
       await Notification.create({
         recipient: recipient._id,
         type: 'enrollment_approved',
@@ -215,7 +215,7 @@ exports.respondToEnrollment = async (req, res) => {
         },
         token: enrollment.student.deviceToken,
       };
-      await sendFCMNotification(notificationMessage);
+      await sendAzureNotification(notificationMessage);
       await Notification.create({
         recipient: enrollment.student._id,
         type: status === 'Approved' ? 'enrollment_approved' : 'enrollment_rejected',
